@@ -1,8 +1,8 @@
 # File::Repl
 #
 # Version
-#      $Source: D:/src/perl/File/Repl/RCS/repl.pm $
-#      $Revision: 1.10 $
+#      $Source: D:/src/perl/File/Repl/RCS/Repl.pm $
+#      $Revision: 1.14 $
 #      $State: Exp $
 #
 # Start comments/code here - will not be processed into manual pages
@@ -10,7 +10,26 @@
 #    Copyright © Dave Roberts  2000,2001
 #
 # Revision history:
-#      $Log: repl.pm $
+#      $Log: Repl.pm $
+#      Revision 1.14  2001/07/12 21:51:50  jj768
+#      additional documentation - and minor code changes
+#
+#      Revision 1.13  2001/07/12 15:18:43  Dave.Roberts
+#      code tidy up and reorganisation
+#      fixed logic errors (A>B! mode in Update method was not copying new files from A to B), also for A<B!
+#      removed several local variables and used referred object directly
+#
+#      Revision 1.12  2001/07/11 10:30:16  Dave.Roberts
+#      resolved various errors introduced in 1.11 - mainly associsated with reference errors
+#      rehacked fc subroutine - to give more logical messages
+#      still in need of more documentation - esp of object reference returned and associated variables
+#
+#      Revision 1.11  2001/07/06 14:52:53  jj768
+#      double referencing of blessed object removed (from New method) and subsequent
+#      methods updated. Requires Testing.
+#      Update and other methods now return reference to data arrays and hashs evaluated
+#      during method call
+#
 #      Revision 1.10  2001/07/06 08:23:48  Dave.Roberts
 #      code changes to allow the colume info to be detected correctly using Win32::AdminMisc
 #      when a drive letter is specified (was only working with UNC names)
@@ -95,7 +114,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = sprintf("%d.%d", q$Revision: 1.10 $ =~ /(\d+)\.(\d+)/);
+our $VERSION = sprintf("%d.%d", q$Revision: 1.14 $ =~ /(\d+)\.(\d+)/);
 
 # Preloaded methods go here.
 #---------------------------------------------------------------------
@@ -103,7 +122,6 @@ sub New {
   my $class = shift;
   my($conf) = $_[0];
   croak "\n Usage: File::Repl->New(\$hashref)\n\n" unless (ref($conf) eq "HASH");
-  
   my($alist,$blist,$atype,$btype,$key,$xxx,$dira,$dirb,$tmp);
   $conf->{dira} =~ s/\\/\//g;     # Make dir use forward slash's
   $conf->{dirb} =~ s/\\/\//g;     # Make dir use forward slash's
@@ -121,17 +139,8 @@ sub New {
     recurse  => (defined $conf->{recurse}) ? $conf->{recurse} : TRUE,    # default recurse TRUE
     mkdirs   => (defined $conf->{mkdirs})  ? $conf->{mkdirs}  : FALSE,   # default mkdirs FALSE
   };
-  
-# Added boolean 'recurse' key to hash and default to true if
-# not defined. This allows faster build of file lists when
-# only interested in top level directory.  (NH311000)
-  my $recurse = $r_con->{recurse};
-  
+
 # Should we continue if dira / dirb dosn't exist ?  (NH301200)
-  my $mkdirs = $r_con->{mkdirs};
-  
-  my $benchmark = $r_con->{bmark};
-  
   if ( $r_con->{verbose} >= 3 ) {
     printf "\n\nFile:Repl configuration settings:\n";
     printf "-------------------------------\n";
@@ -141,9 +150,9 @@ sub New {
   }
   
 # Build the A list
-  benchmark("init") if $benchmark;
+  benchmark("init") if $r_con->{bmark};
   if ( -d $r_con->{dira} ) {
-    if ($recurse) {
+    if ($r_con->{recurse}) {
       $xxx = sub{
         ($tmp = $File::Find::name) =~ s/^\Q$r_con->{dira}//;        # Remove the start directory portion
         ($atype->{$tmp}, $alist->{$tmp}) = (stat($_))[2,9] if $tmp; # Mode is 3rd element, mtime is 10th
@@ -158,18 +167,18 @@ sub New {
       }
       close DIRA;
     }
-    }elsif (!$mkdirs) {
+    }elsif (!$r_con->{mkdirs}) {
     croak "Invalid directory name for dira ($r_con->{dira})\n";
   }
-  benchmark("build A list") if $benchmark;
+  benchmark("build A list") if $r_con->{bmark};
   
 # Build the B list
-  benchmark("init") if $benchmark;
+  benchmark("init") if $r_con->{bmark};
   if ( $r_con->{dira} eq $r_con->{dirb} ) {
     $blist = $alist;
     $btype = $atype;
     }elsif ( -d $r_con->{dirb} ) {
-    if ($recurse) {
+    if ($r_con->{recurse}) {
       $xxx = sub{
         ($tmp = $File::Find::name) =~ s/^\Q$r_con->{dirb}//;        # Remove the start directory portion
         ($btype->{$tmp}, $blist->{$tmp}) = (stat($_))[2,9] if $tmp; # Mode is 3rd element, mtime is 10th
@@ -184,16 +193,14 @@ sub New {
       }
       close DIRB;
     }
-    }elsif (!$mkdirs) {
+    }elsif (!$r_con->{mkdirs}) {
     croak "Invalid directory name for dirb ($r_con->{dirb})\n";
   }
-  benchmark("build B list") if $benchmark;
-  
-  $r_con->{alist} = \$alist;
-  $r_con->{atype} = \$atype;
-  $r_con->{blist} = \$blist;
-  $r_con->{btype} = \$btype;
-  
+  benchmark("build B list") if $r_con->{bmark};
+  $r_con->{alist} = $alist;
+  $r_con->{atype} = $atype;
+  $r_con->{blist} = $blist;
+  $r_con->{btype} = $btype;
   bless  $r_con, $class;
   return $r_con;
 }
@@ -238,21 +245,16 @@ sub Delete {
 #=====================================================================
 
 sub _generic {
-  
   my ($caller) = shift @_;
   my($r_con,$regex,$mode,$commit,$nsub);
   my($refa,$refb,$refatype,$refbtype,$agelimit,$verbose);
   my($name,$mtime,%mark,$afile,$bfile,$amtime,$bmtime,$fc,$md,$del,$type);
-  my(@amatch,@bmatch,$benchmark,$tfiles,$common,$aonly,$bonly,$amatch,@temp,%vol);
-  my($tName,$aName,$bName,$deltree,$truncate,$touch,$rename,$tmp,$atype,$btype);
+  my(@amatch,@bmatch,$benchmark,$tfiles,$common,$aonly,$bonly,$amatch,$bmatch,@temp,%vol);
+  my($tName,$aName,$bName,$deltree,$truncate,$touch,$mv,$tmp,$atype,$btype);
   my ($negregex) = '^$';# Default value - make this impossible to match, neither file nor directory
   my $tz_bias_a = 0;
   my $tz_bias_b = 0;
-  
-# On FAT filesystems, mtime resolution is 1/30th of a second.
-# Increase fudge to 2 to allow for A <> DOS <> B e.g. syncing
-# two machines via a zip disk  (NH311000)
-  my $fudge = 2;
+  my $fudge = 2;  # Fudge factor to allow two machines to synch via a removeable drive/disc (A <> DOS <> B)
   
   if ($caller eq "Update") {
     if ( scalar(@_) == 4 ) {
@@ -264,38 +266,38 @@ sub _generic {
       print scalar(@_), " Args called ( @_ )\n";
       return;
     }
-    $mode      = 'a>b' if ( $mode eq "" );      # Set the default operating mode
-    }elsif($caller eq "Delete"){
+    if ( $mode eq "" ) {      # Set the default operating mode
+      $mode      = 'a>b';
+      print "using default mode for Update method (a>b)\n" if ($verbose > 1);
+    }
+    if ( ! $mode =~ /^(A>B!?)|(A<>B)|(A<B!?)|(a[<>]b)|(a<>b)$/ ) {
+      carp("Illegal mode used for Update method - legal options are\n\tA>B\tA>B!\tA<B\tA<B!\n\tA<>B\ta<b\ta>b\ta<>b\n");
+      return;
+    }
+  }elsif($caller eq "Delete"){
     if ( scalar(@_) eq 3 ) {
       ($r_con,$regex,$commit) =@_;
-# can be of zero length name.
-      }elsif ( scalar(@_) eq 4 ) {
+    }elsif ( scalar(@_) eq 4 ) {
       ($r_con,$regex,$negregex,$commit) =@_;
-      }else{
+    }else{
       carp ("Call the Delete method with the right arguments !\n\t\$ref->Delete(regex, [noregex], commit)");
     }
-    }elsif($caller eq "Rename"){
+  }elsif($caller eq "Rename"){
     if ( scalar(@_) eq 4 ) {
       ($r_con,$regex,$nsub,$commit) =@_;
-# can be of zero length name.
-      }elsif ( scalar(@_) eq 5 ) {
+    }elsif ( scalar(@_) eq 5 ) {
       ($r_con,$regex,$negregex,$nsub,$commit) =@_;
-      }else{
+    }else{
       carp ("Call the Rename method with the right arguments !\n\t\$ref->Rename(regex, [noregex], namesub, commit)");
     }
   }
-   
-  
-  my $nocase = $r_con->{nocase};
-  
-# Expiry time for tombstone indicator files in seconds
-  my $ttl = $r_con->{ttl} * 60 * 60 * 24;
-   
-  $commit    = TRUE unless defined $commit;   # Set default commit value
+
+  my $ttl = $r_con->{ttl} * 86400;                               # Expiry time for tombstone indicator files in seconds
+  $commit    = TRUE unless defined $commit;                      # Set default commit value
   $verbose   = $r_con->{verbose};
-  $agelimit  = $r_con->{agelimit} ? $r_con->{agelimit} * 86400 : 0;
-  $benchmark = $r_con->{bmark};
-  
+  $agelimit  = $r_con->{agelimit} ? $r_con->{agelimit} * 86400 : 0; # Determine age limit in seconds
+  $negregex  = '^$' unless $negregex;                            # Ensure no matches if $negregex = ''
+
 # Fix for stat/utime on FAT filesystems (NH270301)
   if ($TZ_BIAS) {
     if ( ( $r_con->{dira} =~ /^([a-z]:)/i ) ||                   # First match a drive letter - ie D:
@@ -312,89 +314,94 @@ sub _generic {
     }
     $tz_bias_a = $tz_bias_b = 0 if ($tz_bias_a && $tz_bias_b);
   }
-  
-  if ($verbose >= 3) {
-    print "Update\n  Regex    : $regex\n  NegRegex : $negregex\n";
-    print "  Mode     : $mode\n  Commit   : $commit\n";
-    print "  AgeLimit : $r_con->{agelimit}  ($agelimit)\n";
-    print "  Tombstone File TTL : $ttl\n";
-    print "  DirA DOS time adj : $tz_bias_a\n";
-    print "  DirB DOS time adj : $tz_bias_b\n\n";
-  }
-# Ensure no matches if $negregex = ''
-  $negregex = '^$' unless $negregex;
+
+  print "Update
+  Regex    : $regex
+  NegRegex : $negregex
+  Mode     : $mode
+  Commit   : $commit
+  AgeLimit : $r_con->{agelimit} days ($agelimit seconds)
+  Tombstone File TTL : $ttl
+  DirA DOS time adj  : $tz_bias_a
+  DirB DOS time adj  : $tz_bias_b\n\n" if ($verbose >= 3);
   
 # Sort files using regex and negregex
-  benchmark("init") if $benchmark;
-  ($tfiles,$common,$aonly,$bonly,$amatch,$refa,$refb,$refatype,$refbtype) =
-  _arraysort($r_con, $regex, $negregex, $nocase) ;
-  benchmark("match files") if $benchmark;
+  benchmark("init") if $r_con->{bmark};
+  ($tfiles,$common,$aonly,$bonly,$amatch,$bmatch,$refa,$refb,$refatype,$refbtype) =
+    _arraysort($r_con, $regex, $negregex, $r_con->{nocase}) ;
+  benchmark("match files") if $r_con->{bmark};
 #****************************************************************
 # sub to copy files and build directory structure
 #****************************************************************
   $fc = sub {
-    my($a,$b,$amtime,$bmtime,$mode) = @_;
-    my($btmp);
-    
-# Ignore the file if agelimit is switched on and file exceeds
-# this
-    if ( $agelimit && (( time - $amtime ) > $agelimit )) {
-      print " $a ignored - exceeds age limit \n" if $verbose > 1;
+    my($a,$b,$amtime,$bmtime,$disp,$mode) = @_;
+    my($A,$B,$Amtime,$Bmtime,$Btmp,$age,$msg);
+    print "fc ($a,$b,$amtime,$bmtime,$disp,$mode)\n" if $verbose > 3;
+    if ( $disp eq "-->" ) {
+      $A = $a;
+      $B = $b;
+      $Amtime = $amtime;
+      $Bmtime = $bmtime;
+    }elsif( $disp eq "<--" ) {
+      $A = $b;
+      $B = $a;
+      $Amtime = $bmtime;
+      $Bmtime = $amtime;
+    }else{
+      print "Illegal display option called ($disp)\n";
+      return 0;
+    }
+    $msg = " $a $disp $b";
+    ($bmtime > $amtime) ? $age = $bmtime : $age = $amtime; # Find the most recent mtime ($age)
+    if ( $agelimit && (( time - $age ) > $agelimit )) { # Test for agelimit exceeded
+      printf "%s - exceeds age limit (%3.1d days old - limit is set to %3d days)\n",$msg,(time - $age)/86400,$agelimit/86400 if ($verbose > 1);
       return FALSE;
     }
-    return TRUE unless $commit;
-    
-# Make sure the parent of the target file exists
-    return FALSE unless &$md(dirname($b));
-    
-    if ( -f $a ) {
-      if ( -f $b ) {
-# If we have a file to copy, and we are replacing a previous version create a filename
-# that we can rename the previous version to.
-        $btmp = $b . '.X';
-        while ( -f $btmp ) {
-          $btmp .= 'X';
-          print " *************** $btmp\n";
+    if ( ! $commit ) {
+      print "$msg\n"  if ($verbose >= 1);
+      return TRUE;
+    }
+    return FALSE unless &$md(dirname($B)); # Make sure the parent of the target file exists
+    if ( -f $A ) {
+      if ( -f $B ) {
+        $Btmp = $B . '.X';
+        while ( -f $Btmp ) {  #  Find a temporary file name to copy target to (allows rollback after a copy failure)
+          $Btmp .= 'X';
+          print " *************** $Btmp\n";  # kind of error - this temp filename is already in use...
         }
-# rename old copy of $b - to restore if the copy fails
-        unless ( rename ($b, $btmp) ) {
-          carp "Unable to create temp copy of $b ($btmp) \n";
-          undef $btmp;
+        unless ( rename ($B, $Btmp) ) { # rename old copy of $B to $Btmp - to restore if the copy fails
+          carp "Unable to create temp copy of $B ($Btmp) \n";  # carp if this fails - but continue.....
+          undef $Btmp;
         }
       }
       
-      if ( copy ($a,$b) ) {
+      if ( copy ($A,$B) ) {
+        print "$msg\n"  if ($verbose >= 1);
 # ******
 # this needs modifying for UNIX
-        chmod(0666,$b) if !($mode & 0x02);
-        utime($amtime,$amtime,$b) || carp "Failed to set modification time on $b\n";
-        chmod(0444,$b) if !($mode & 0x02);
+        chmod(0666,$B) if !($mode & 0x02);
+        utime($Amtime,$Amtime,$B) || carp "Failed to set modification time on $B\n";
+        chmod(0444,$B) if !($mode & 0x02);
 # ******
-        if ( $btmp ) {
-# If we had renamed a previous version of file (for potential recovery) we
-# delete it now.
-          unlink $btmp || carp "Failed to delete temporary file $btmp\n";
+        if ( $Btmp ) {  # remove the temporary file created
+          unlink $Btmp || carp "Failed to delete temporary file $Btmp\n";
         }
         return TRUE;
-        }else{
-        carp "unable to copy $a\n";
-        if ( $btmp ) {
-# If we had renamed a previous version of file (for potential recovery) we
-# restore it now
-          unless ( rename ($btmp, $b) ) {
-            carp "Unable to restore $b from temp copy of $btmp following failed file copy\n";
-            undef $btmp;
+      }else{
+        carp "$msg - failed to copy $A\n";
+        if ( $Btmp ) {
+          unless ( rename ($Btmp, $B) ) {  # restore the temporary file after a copy failure
+            carp "Unable to restore $B from temp copy of $Btmp following failed file copy\n";
+            undef $Btmp;
           }
         }
       }
       }else{
-      if ( ! -d $b ) {
-        mkdir($b,0777) && return TRUE || carp "Unable to create directory $b\n";
+      if ( ! -d $B ) {
+        mkdir($B,0777) && return TRUE || carp "Unable to create directory $B\n";
+        print "$msg - (new directory)\n"  if ($verbose >= 1);
       }
 #  setting utime doe'nt work on a dir.  Maybe FS rules ??
-#utime($amtime,$amtime,$b) || carp "Failed to set modification time on $b\n";
-#my($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,$blksize,$blocks) = stat($b);
-#print " A mtime $amtime\n B mtime $mtime\n";
     }
     return FALSE;
   };
@@ -419,27 +426,24 @@ sub _generic {
 #****************************************************************
   $del = sub {
     my($targ, $mtime) = @_;
-    if ($verbose >= 1) {
-      (-d $targ) ? print "  rmdir  $targ\n" : print "  remove $targ\n";
-    }
+    print "del ($targ,$mtime)\n" if $verbose > 3;
+    my($msg);
+    (-d $targ) ? $msg = "  rmdir  $targ" : $msg = "  rm $targ";
     if ( $mtime && $agelimit && (( time - $mtime ) > $agelimit )) {
-      if ( $verbose >= 1 ) {
-        print "$a ignored - exceeds age limit -";
-      printf "   (%3.1d days old - limit set is %3d days))\n", (time - $mtime)/(86400), $agelimit/(86400);
+      printf "%s - exceeds age limit (%3.1d days - limit is %3d days))\n", $msg, (time - $mtime)/(86400), $agelimit/(86400) if ( $verbose > 1 );
+      return FALSE;
+    }else{
+      print "$msg\n" if ($verbose >= 1);
     }
-    return FALSE;
-  }
   return TRUE unless $commit;
   if (-d $targ) {
     rmdir $targ || carp "Unable to delete directory $targ\n";
     return ! -d $targ;
-    }elsif (-f $targ) {
+  }elsif (-f $targ) {
     unlink $targ || carp "Unable to delete file $targ\n";
     return ! -f $targ;
-    }else{
+  }else{
     print "** DO SOMETHING HERE ** (NOT ORDINARY FILE OR DIRECTORY)\n";
-# should do something here ???
-# UNIX links ???
   }
   return FALSE;
 };
@@ -490,16 +494,22 @@ $touch = sub {
 #****************************************************************
 # sub to rename a file or directory
 #****************************************************************
-$rename = sub {
+$mv = sub {
   my($old,$new) = @_;
-  return TRUE unless $commit;
-  if ( rename ($old,$new)) {
+  my($msg) = "mv $old $new";
+  unless ($commit) {
+    print "$msg\n" if ($verbose > 1);
     return TRUE;
+  }elsif ( rename ($old,$new)) {
+    print "$msg\n" if ($verbose > 1);
+    return TRUE;
+  }else{
+    print "$msg - Failed \n";
+    return FALSE;
   }
-  return FALSE;
 };
 
-benchmark("init") if $benchmark;
+benchmark("init") if $r_con->{bmark};
 if ( $caller eq "Update" ) {
 #****************************************************************
 # Delete tombstoned files (NH261100)
@@ -510,27 +520,27 @@ if ( $caller eq "Update" ) {
 # Delete <dir.remove> trees and touch a file with same name
     if (-d $r_con->{dira} . $tName) {
       &$deltree($tName, $r_con->{dira}, $refa, $refatype, TRUE);
-      &$touch($r_con->{dira} . $tName, \$$refa->{$tName}, $$refatype->{$tName});
+      &$touch($r_con->{dira} . $tName, \$refa->{$tName}, $refatype->{$tName});
     }
     if (-d $r_con->{dirb} . $tName) {
       &$deltree($tName, $r_con->{dirb}, $refb, $refbtype, TRUE);
-      &$touch($r_con->{dirb} . $tName, \$$refb->{$tName}, $$refbtype->{$tName});
+      &$touch($r_con->{dirb} . $tName, \$refb->{$tName}, $refbtype->{$tName});
     }
     
 # Delete <dir> trees and files
-    if ($nocase) {
-      ($aName) = grep { /^$name$/i } (keys %$$refa);
-      ($bName) = grep { /^$name$/i } (keys %$$refb);
+    if ($r_con->{nocase}) {
+      ($aName) = grep { /^$name$/i } (keys %$refa);
+      ($bName) = grep { /^$name$/i } (keys %$refb);
       }else{
-      $aName = ($$refa->{$name}) ? $name : undef;
-      $bName = ($$refb->{$name}) ? $name : undef;
+      $aName = ($refa->{$name}) ? $name : undef;
+      $bName = ($refb->{$name}) ? $name : undef;
     }
     if ($aName) {
       if (-d $r_con->{dira} . $aName) {
 # Delete dir trees including top level dir
         &$deltree($aName, $r_con->{dira}, $refa, $refatype, TRUE);
         }else{
-        delete $$refa->{$aName}, delete $$refatype->{$aName} if &$del($r_con->{dira} . $aName);
+        delete $refa->{$aName}, delete $refatype->{$aName} if &$del($r_con->{dira} . $aName);
       }
     }
     if ($bName) {
@@ -538,7 +548,7 @@ if ( $caller eq "Update" ) {
 # Delete dir trees including top level dir
         &$deltree($bName, $r_con->{dirb}, $refb, $refbtype, TRUE);
         }else{
-        delete $$refb->{$bName}, delete $$refbtype->{$bName} if &$del($r_con->{dirb} . $bName);
+        delete $refb->{$bName}, delete $refbtype->{$bName} if &$del($r_con->{dirb} . $bName);
       }
     }
   }
@@ -547,64 +557,66 @@ if ( $caller eq "Update" ) {
 # Truncate (which will also touch) nonzero byte files (NH070401)
 #****************************************************************
   foreach (@$tfiles) {
-    $afile = $$refa->{$_} ? $r_con->{dira} . $_ : undef;
-    $bfile = $$refb->{$_} ? $r_con->{dirb} . $_ : undef;
+    $afile = $refa->{$_} ? $r_con->{dira} . $_ : undef;
+    $bfile = $refb->{$_} ? $r_con->{dirb} . $_ : undef;
     &$truncate(\$afile, \$$refa->{$_}) if ($afile && -s $afile);
     &$truncate(\$bfile, \$$refb->{$_}) if ($bfile && -s $bfile);
-    delete $$refa->{$_}, delete $$refatype->{$_} if ($afile && (($$refa->{$_} + $ttl) < time) && &$del($afile));
-    delete $$refb->{$_}, delete $$refbtype->{$_} if ($bfile && (($$refb->{$_} + $ttl) < time) && &$del($bfile));
+    delete $refa->{$_}, delete $refatype->{$_} if ($afile && (($refa->{$_} + $ttl) < time) && &$del($afile));
+    delete $refb->{$_}, delete $refbtype->{$_} if ($bfile && (($refb->{$_} + $ttl) < time) && &$del($bfile));
   }
-  
-  if ( $mode =~ /^(A>B)|(A<>B)$/ ) {
+  # Note: modify arrays etc even if $commit is not set.  This is required to determine behaviour of code
+  # without changing or deleting files and directories.
+  if ( $mode =~ /^(A>B!?)|(A<>B)$/ ) {
     foreach (@$aonly) {
-      next unless exists $$refa->{$_};
+      next unless exists $refa->{$_};
       $afile  = $r_con->{dira} . $_;
-      $amtime = $$refa->{$_} - $tz_bias_a + $tz_bias_b;
-      $atype  = $$refatype->{$_};
+      $amtime = $refa->{$_} - $tz_bias_a + $tz_bias_b;
+      $atype  = $refatype->{$_};
       $bfile  = $r_con->{dirb} . $_;
-      print " $afile --> $bfile\n" if ($verbose >= 1);
-      $$refb->{$_} = $amtime, $$refbtype->{$_} = $$refatype->{$_}
-      if &$fc($afile,$bfile,$amtime,"",$atype);
+      #print " $afile --> $bfile\n" if ($verbose >= 1);
+      $refb->{$_} = $amtime, $refbtype->{$_} = $refatype->{$_} if &$fc($afile,$bfile,$amtime,0,"-->",$atype);
     }
   }
-  if ( $mode =~ /^(A<B)|(A<>B)$/ ) {
+  if ( $mode =~ /^(A<B!?)|(A<>B)$/ ) {
     foreach (@$bonly) {
-      next unless exists $$refb->{$_};
+      next unless exists $refb->{$_};
       $afile  = $r_con->{dira} . $_;
       $bfile  = $r_con->{dirb} . $_;
-      $bmtime = $$refb->{$_} - $tz_bias_b + $tz_bias_a;
-      $btype  = $$refbtype->{$_};
-      print " $afile <-- $bfile\n" if ($verbose >= 1);
-      $$refa->{$_} = $bmtime, $$refatype->{$_} = $$refbtype->{$_}
-      if &$fc($bfile,$afile,$bmtime,"",$btype);
+      $bmtime = $refb->{$_} - $tz_bias_b + $tz_bias_a;
+      $btype  = $refbtype->{$_};
+      #print " $afile <-- $bfile\n" if ($verbose >= 1);
+      $refa->{$_} = $bmtime, $refatype->{$_} = $refbtype->{$_} if &$fc($afile,$bfile,0,$bmtime,"<--",$btype);
     }
   }
   if ( $mode =~ /^A<B!$/ ) {
     foreach (@$aonly) {
-      next unless exists $$refa->{$_};
+      next unless exists $refa->{$_};
       $afile  = $r_con->{dira} . $_;
-      $amtime = $$refa->{$_};
-      delete $$refa->{$_}, delete $$refatype->{$_} if &$del($afile, $amtime);
+      $amtime = $refa->{$_};
+      delete $refa->{$_}, delete $refatype->{$_} if &$del($afile, $amtime);
     }
   }
   if ( $mode =~ /^A>B!$/ ) {
     foreach (@$bonly) {
-      next unless exists $$refb->{$_};
+      next unless exists $refb->{$_};
       $bfile  = $r_con->{dirb} . $_;
-      $bmtime = $$refb->{$_};
-      delete $$refb->{$_}, delete $$refbtype->{$_} if &$del($bfile, $bmtime);
+      $bmtime = $refb->{$_};
+      delete $refb->{$_}, delete $refbtype->{$_} if &$del($bfile, $bmtime);
     }
   }
+
   foreach $aName (keys %$common) {
-    next unless exists $$refa->{$aName};
+#    print "aName $aName\n";
+#    printf "Ref: %s\n",$refa->{$aName};
+    next unless exists $refa->{$aName};
 # To allow for non case sensitive filesystems
 # %common key holds the 'a' name and
 # %common value holds the 'b' name
     $bName  = $$common{$aName};
-    $amtime = $$refa->{$aName} - $tz_bias_a;
-    $bmtime = $$refb->{$bName} - $tz_bias_b;
-    $atype  = $$refatype->{$aName};
-    $btype  = $$refbtype->{$bName};
+    $amtime = $refa->{$aName} - $tz_bias_a;
+    $bmtime = $refb->{$bName} - $tz_bias_b;
+    $atype  = $refatype->{$aName};
+    $btype  = $refbtype->{$bName};
     $afile  = $r_con->{dira} . $aName;
     $bfile  = $r_con->{dirb} . $bName;
     
@@ -614,73 +626,67 @@ if ( $caller eq "Update" ) {
     if ( $amtime > ($bmtime + $fudge) ) {
       $amtime += $tz_bias_b;
       if ( $mode =~ /^(a>b)|(a<>b)|(A>B)|(A>B!)|(A<>B)$/ ) {
-        if ( -f $afile ) {
-          print " $afile --> $bfile\n" if ($verbose >= 1);
-          print "  ($amtime) --> ($bmtime)\n" if ($verbose >= 2);
-        }
-        $$refb->{$bName} = $amtime if (&$fc($afile,$bfile,$amtime,$bmtime,$atype));
+        #if ( -f $afile ) {
+        #  print " $afile --> $bfile\n" if ($verbose >= 1);
+        #  print "  ($amtime) --> ($bmtime)\n" if ($verbose >= 2);
+        #}
+        $refb->{$bName} = $amtime if (&$fc($afile,$bfile,$amtime,$bmtime,"-->",$atype));
       }
       }elsif ( ($amtime + $fudge) < $bmtime ) {
       $bmtime += $tz_bias_a;
       if ( $mode =~ /^(a<b)|(a<>b)|(A<B)|(A<B!)|(A<>B)$/ ) {
-        if ( -f $afile ) {
-          print " $afile <-- $bfile\n" if ($verbose >= 1);
-          print "  ($amtime) <-- ($bmtime)\n" if ($verbose >= 2);
-        }
-        $$refa->{$aName} = $bmtime if (&$fc($bfile,$afile,$bmtime,$amtime,$btype));
+        #if ( -f $afile ) {
+        #  print " $afile <-- $bfile\n" if ($verbose >= 1);
+        #  print "  ($amtime) <-- ($bmtime)\n" if ($verbose >= 2);
+        #}
+        $refa->{$aName} = $bmtime if (&$fc($afile,$bfile,$amtime,$bmtime,"<--",$btype));
       }
     }
   }
   }elsif( $caller eq "Delete" ) {
   foreach my $f (@$amatch) {
-    next unless exists $$refa->{$f};
+    next unless exists $refa->{$f};
     $afile  = $r_con->{dira} . $f;
-    $amtime = $$refa->{$f} - $tz_bias_a + $tz_bias_b;
-    $atype  = $$refatype->{$f};
-    print " rm $afile\n" if ($verbose >= 1);
+    $amtime = $refa->{$f} - $tz_bias_a + $tz_bias_b;
+    $atype  = $refatype->{$f};
     if (&$del($afile, $amtime)) {
       if ($commit) {
-        delete $$refa->{$f};
-        delete $$refatype->{$f};
+        delete $refa->{$f};
+        delete $refatype->{$f};
 # remove reference to this file from the arrays @aonly etc.
       }
     }
   }
   }elsif( $caller eq "Rename" ) {
   foreach my $f (@$amatch) {
-    next unless exists $$refa->{$f};
+    next unless exists $refa->{$f};
     my($newname) = $f;
     if ( $nsub =~ /^([.])(.*)($1)(.*)($1)(.*)$/ ) {
       my($sep,$match,$replace,$arg) = ($1,$2,$4,$5);
       $newname =~ s/$match/$match/;
       $afile  = $r_con->{dira} . $f;
       my ($Afile) = $r_con->{dira} . $newname;
-      print " mv $afile $Afile\n" if ($verbose >= 1);
-      if (&$rename($afile,$Afile)){
-        if ( $commit ) {
-          $$refa->{$Afile}     = $$refa->{$f};
-          $$refatype->{$Afile} = $$refatype->{$f};
-          delete $$refa->{$f};
-          delete $$refatype->{$f};
-# remove reference to this file from the arrays @aonly etc.
-        }
+      if (&$mv($afile,$Afile)){
+        $refa->{$Afile}     = $refa->{$f};
+        $refatype->{$Afile} = $refatype->{$f};
+        delete $refa->{$f};
+        delete $refatype->{$f};
       }
-      }else{
+    }else{
       carp "unable to understand substition argument $nsub\n";
     }
   }
 }
 
 #  add references to allow @aonly, @bonly etc to be recalled from the reference
-$r_con->{amatch} = \$amatch;
-$r_con->{aonly}  = \$aonly;
-$r_con->{bonly}  = \$bonly;
-$r_con->{common} = \$common;
-
-
-
-
-benchmark("synch files") if $benchmark;
+my($retval);
+$retval->{amatch} = $amatch;
+$retval->{bmatch} = $bmatch;
+$retval->{aonly}  = $aonly;
+$retval->{bonly}  = $bonly;
+$retval->{common} = $common;
+benchmark("synch files") if $r_con->{bmark};
+return $retval;
 }
 
 #=====================================================================
@@ -706,24 +712,24 @@ my $regexextn = $nocase ? '(?i)' : '';
 
 # Find files matching the regex in dira
 print "Files Matching regex in $r_con->{dira}:\n" if ($verbose >= 4);
-foreach $name (keys %$$refa) {
+foreach $name (keys %$refa) {
   if ( $name && ($name =~ /$regexextn$regex/) && ($name !~ /$regexextn$negregex/) ) {
     push (@amatch,$name);
     if ($verbose >= 4) {
-      $mtime = %$$refa->{$name};
-      $type  = %$$refatype->{$name};
+      $mtime = %$refa->{$name};
+      $type  = %$refatype->{$name};
       print "  $mtime  $type  $name\n";
     }
   }
 }
 # Find files matching the regex in dirb
 print "Files Matching regex in $r_con->{dirb}:\n" if ($verbose >= 4);
-foreach $name (keys %$$refb) {
+foreach $name (keys %$refb) {
   if ( $name && $name =~ /$regexextn$regex/ && $name !~ /$regexextn$negregex/ ) {
     push (@bmatch,$name);
     if ($verbose >= 4) {
-      $mtime = %$$refb->{$name};
-      $type  = %$$refbtype->{$name};
+      $mtime = %$refb->{$name};
+      $type  = %$refbtype->{$name};
       print "  $mtime  $type  $name\n";
     }
   }
@@ -797,9 +803,12 @@ if ( $verbose >= 3 ) {
   }
   print "Replicating ...\n";
 }
-return (\@tfiles, \%common, \@aonly, \@bonly, \@amatch, $refa,$refb,$refatype,$refbtype);
+return (\@tfiles, \%common, \@aonly, \@bonly, \@amatch, \@bmatch, $refa,$refb,$refatype,$refbtype);
 }
 #=====================================================================
+#  If this is called with with "init" argument this initialises global variable @times
+#  - a record of user and system times;
+#  Otherwise difference since last init (user and system times) is printed to STDOUT
 my @times; # global var
 sub benchmark ($@) {
 my($str,$r1,$u1,$s1) = @_;
@@ -830,8 +839,8 @@ File::Repl - Perl module that provides file replication utilities
   };
 
   $ref=File::Repl->New(\%con);
-  $ref->Update('\.p(l|m)','a<>b',1);
-  $ref->Update('\.t.*','a<>b',1,'\.tmp$');
+  $r1 = $ref->Update('\.p(l|m)','a<>b',1);
+  $r2 = $ref->Update('\.t.*','a<>b',1,'\.tmp$');
 
 =head1 DESCRIPTION
 
@@ -894,23 +903,24 @@ The verbose flag has several valid values:
 
 =over 8
 
-=item 0
+=item verbose = 0
 
 No verbosity (default mode).
 
-=item 1
+=item verbose = 1
 
 All file copies and deletes are printed.
 
-=item 2
+=item verbose = 2
 
-Tombstone file trunkations are printed, and any timestamp changes made,
+Tombstone file trunkations are printed, and any timestamp changes made.  Any file copies
+or deletes that would have been made that failed the agelimit criteria are printed.
 
-=item 3
+=item verbose = 3
 
 Configuration settings (from I<%con>) and Files meeting the match criteria are printed.
 
-=item 4
+=item verbose = 4
 
 Files identified in each directory that match the regex requirements (from the B<Update>
 method) are printed.
@@ -958,6 +968,12 @@ replicas.
 If a directory is tombstoned (by adding I<.remove> to its name) the directory and contents
 are removed and a file with the directory name and the I<.remove> suffix replaces it.  The
 file is removed as a normally tombstoned file.
+
+The Update method returns a reference to data structures evaluated during the method call.
+This is based on the method arguments, and allows arrays and hash's of the file structure
+meeting the selection criteria to be returned. See L<"EXAMPLES">.  Note that the aonly,
+bonly, amatch and bmatch array references, and the common hash reference all refer to the
+file structure state BEFORE the Update method makes any changes.
 
 =over 0
 
@@ -1067,7 +1083,7 @@ An optional regular expression used to match all files not to be renamed
 The argument used for a perl substitution command is applied to the file name
 to create the file's new name.
 
-e.g. /\.pl$/\.perl\$/
+e.g. /\.pl$/\.perl/
 
 This examplewill rename all files (that meet I<regex> and I<noregex> criteria)
 from .pl to .perl
@@ -1133,6 +1149,103 @@ If we don't maintain FAT filesystems at UTC time and the repl is between FAT and
 NON-FAT systems, then all files will get replicated whenever the TZ or Daylight
 Savings Time changes.
 
+=head1 EXAMPLES
+
+A simple example that retrieves and prints the working variables from the I<Update> method
+
+  $ref=File::Repl->New(\%hash);
+  $my=$ref->Update('.*','A>B',1);
+
+  $sub = sub {  # simple sub that determines the reference type and prints the associated values
+    my ($ref) =$_[0];
+    if ( ref($ref) eq "SCALAR" ) {
+      print "  SCALAR $ref\n";
+    }elsif( ref($ref) eq "ARRAY" ) {
+      print "  ARRAY";
+      foreach (@$ref) {
+        print "\t$_\n";
+      }
+    }elsif( ref($ref) eq "HASH" ) {
+      print "  HASH ";
+      foreach (keys %$ref) {
+        print "\t$_ => $$ref{$_}\n";
+      }
+    }elsif( ref($ref) eq "REF" ) {
+      &$sub($$ref);
+    }else{
+      print "  VALUE\t$ref\n";
+    }
+    print "\n";
+  };
+  foreach my $key (sort keys %$my) {
+    print "$key:\n";
+    &$sub($$my{$key});
+  }
+
+and a sample output 
+
+  References and values of $my
+  amatch:
+    ARRAY /a/b/c/d/e/dummy.c
+          /a/b
+          /a/b/c/d/e/bar.pl
+          /a/b/c/d/e/ABCDE.XYZ
+          /a
+          /a/b/c/d/e/foo.tst
+          /a/b/c/d
+          /a/b/c/d/e
+          /a/b/c
+
+  aonly:
+    ARRAY /a/b/c/d/e/foo.tst
+          /a/b/c/d/e/dummy.c
+          /a/b/c/d/e/ABCDE.XYZ
+
+  bmatch:
+    ARRAY /a/b
+          /a/b/c/d/e/bar.pl
+          /a
+          /a/b/c/d
+          /a/b/c/d/e
+          /a/b/c
+
+  bonly:
+    ARRAY
+  common:
+    HASH  /a/b => /a/b
+          /a/b/c/d/e/bar.pl => /a/b/c/d/e/bar.pl
+          /a => /a
+          /a/b/c/d => /a/b/c/d
+          /a/b/c/d/e => /a/b/c/d/e
+          /a/b/c => /a/b/c
+
+The amatch and bmatch array references are those files and directory's in the adir and bdir
+structures that met the I<regex> and I<negregex> regular expression criteria.  The aonly and
+bonly array references give those files and directories that exist only in that directory
+structure.
+
+The common hash reference identifies those files and directories that exist in both dira and dirb
+directory structures.  The key is for the dira, and value for dirb.  Note that, depending on the
+I<nocase> value the key and value may show differences in case on FAT and NTFS file systems.
+
+A similar approach could be used to determine the referenced data from $ref.  This would
+give access to
+
+=over 4
+
+=item alist (blist)
+
+a hash of file names (the key) and values (mtime) of all files in the adir (or bdir) structure.
+
+=item atype (btype)
+
+a hash of file names (the key) and values (file mode - from a stat operation) of all files in the
+adir (or bdir) structure.
+
+=back
+
+In addition the scalar values of various settings determined when the I<New> method is called can be
+determined.
 
 =head1 AUTHOR
 
@@ -1160,7 +1273,26 @@ out of the use of the script.
 
 =head1 CHANGE HISTORY
 
-$Log: repl.pm $
+$Log: Repl.pm $
+Revision 1.14  2001/07/12 21:51:50  jj768
+additional documentation - and minor code changes
+
+Revision 1.13  2001/07/12 15:18:43  Dave.Roberts
+code tidy up and reorganisation
+fixed logic errors (A>B! mode in Update method was not copying new files from A to B), also for A<B!
+removed several local variables and used referred object directly
+
+Revision 1.12  2001/07/11 10:30:16  Dave.Roberts
+resolved various errors introduced in 1.11 - mainly associsated with reference errors
+rehacked fc subroutine - to give more logical messages
+still in need of more documentation - esp of object reference returned and associated variables
+
+Revision 1.11  2001/07/06 14:52:53  jj768
+double referencing of blessed object removed (from New method) and subsequent
+methods updated. Requires Testing.
+Update and other methods now return reference to data arrays and hashs evaluated
+during method call
+
 Revision 1.10  2001/07/06 08:23:48  Dave.Roberts
 code changes to allow the colume info to be detected correctly using Win32::AdminMisc
 when a drive letter is specified (was only working with UNC names)
