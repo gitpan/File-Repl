@@ -2,7 +2,7 @@
 #
 # Version
 #      $Source: D:/src/perl/File/Repl/RCS/repl.pm $
-#      $Revision: 1.9 $
+#      $Revision: 1.10 $
 #      $State: Exp $
 #
 # Start comments/code here - will not be processed into manual pages
@@ -11,6 +11,10 @@
 #
 # Revision history:
 #      $Log: repl.pm $
+#      Revision 1.10  2001/07/06 08:23:48  Dave.Roberts
+#      code changes to allow the colume info to be detected correctly using Win32::AdminMisc
+#      when a drive letter is specified (was only working with UNC names)
+#
 #      Revision 1.9  2001/06/27 13:35:53  Dave.Roberts
 #      minor presentation changes
 #
@@ -91,7 +95,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = sprintf("%d.%d", q$Revision: 1.9 $ =~ /(\d+)\.(\d+)/);
+our $VERSION = sprintf("%d.%d", q$Revision: 1.10 $ =~ /(\d+)\.(\d+)/);
 
 # Preloaded methods go here.
 #---------------------------------------------------------------------
@@ -294,10 +298,16 @@ sub _generic {
   
 # Fix for stat/utime on FAT filesystems (NH270301)
   if ($TZ_BIAS) {
-    if ( %vol = Win32::AdminMisc::GetVolumeInfo( $r_con->{dira} )){
+    if ( ( $r_con->{dira} =~ /^([a-z]:)/i ) ||                   # First match a drive letter - ie D:
+    ( $r_con->{dira} =~ /^([\\\/].\w+[\\\/][a-z0-9\$]+)/i ) ||   # Else match a share - ie //comp/share or \\comp\share
+    ( Win32::GetCwd() =~ /^([a-z]:)/i ) ) {                      # Else assume relative path - use CWD 
+      %vol = Win32::AdminMisc::GetVolumeInfo( $1 );
       $tz_bias_a = $TZ_BIAS if ($vol{FileSystemName} =~ m/FAT/);
     }
-    if ( %vol = Win32::AdminMisc::GetVolumeInfo( $r_con->{dirb} )){
+    if ( ( $r_con->{dirb} =~ /^([a-z]:)/i ) ||                   # First match a drive letter - ie D:
+    ( $r_con->{dirb} =~ /^([\\\/].\w+[\\\/][a-z0-9\$]+)/i ) ||   # Else match a share - ie //comp/share or \\comp\share
+    ( Win32::GetCwd() =~ /^([a-z]:)/i ) ) {                      # Else assume relative path - use CWD 
+       %vol = Win32::AdminMisc::GetVolumeInfo( $1 );
       $tz_bias_b = $TZ_BIAS if ($vol{FileSystemName} =~ m/FAT/);
     }
     $tz_bias_a = $tz_bias_b = 0 if ($tz_bias_a && $tz_bias_b);
@@ -661,6 +671,15 @@ if ( $caller eq "Update" ) {
   }
 }
 
+#  add references to allow @aonly, @bonly etc to be recalled from the reference
+$r_con->{amatch} = \$amatch;
+$r_con->{aonly}  = \$aonly;
+$r_con->{bonly}  = \$bonly;
+$r_con->{common} = \$common;
+
+
+
+
 benchmark("synch files") if $benchmark;
 }
 
@@ -804,7 +823,7 @@ File::Repl - Perl module that provides file replication utilities
   use File::Repl;
 
   %con = {
-    dira     => 'D:/perl',
+    dira     => 'C:/perl',
     dirb     => 'M:/perl',
     verbose  => '1',
     age      => '10',
@@ -1142,6 +1161,10 @@ out of the use of the script.
 =head1 CHANGE HISTORY
 
 $Log: repl.pm $
+Revision 1.10  2001/07/06 08:23:48  Dave.Roberts
+code changes to allow the colume info to be detected correctly using Win32::AdminMisc
+when a drive letter is specified (was only working with UNC names)
+
 Revision 1.9  2001/06/27 13:35:53  Dave.Roberts
 minor presentation changes
 
