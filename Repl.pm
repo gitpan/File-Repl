@@ -1,8 +1,8 @@
 # File::Repl
 #
 # Version
-#      $Source: D:/src/perl/File/Repl/RCS/Repl.pm $
-#      $Revision: 1.8 $
+#      $Source: D:/src/perl/File/Repl/RCS/repl.pm $
+#      $Revision: 1.9 $
 #      $State: Exp $
 #
 # Start comments/code here - will not be processed into manual pages
@@ -10,7 +10,10 @@
 #    Copyright © Dave Roberts  2000,2001
 #
 # Revision history:
-#      $Log: Repl.pm $
+#      $Log: repl.pm $
+#      Revision 1.9  2001/06/27 13:35:53  Dave.Roberts
+#      minor presentation changes
+#
 #      Revision 1.8  2001/06/27 12:59:22  jj768
 #      logic to prevent "Use of uninitialized value in pattern match (m//)" errors on use of $vol{FileSystemName}
 #
@@ -82,17 +85,13 @@ our @ISA = qw(Exporter);
 # This allows declaration	use File::Repl ':all';
 # If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
 # will save memory.
-our %EXPORT_TAGS = ( 'all' => [ qw(
-	
-) ] );
-
+our %EXPORT_TAGS = ( 'all' => [ qw( ) ] );
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-
 our @EXPORT = qw(
 	
 );
 
-our $VERSION = sprintf("%d.%d", q$Revision: 1.8 $ =~ /(\d+)\.(\d+)/);
+our $VERSION = sprintf("%d.%d", q$Revision: 1.9 $ =~ /(\d+)\.(\d+)/);
 
 # Preloaded methods go here.
 #---------------------------------------------------------------------
@@ -1142,7 +1141,10 @@ out of the use of the script.
 
 =head1 CHANGE HISTORY
 
-$Log: Repl.pm $
+$Log: repl.pm $
+Revision 1.9  2001/06/27 13:35:53  Dave.Roberts
+minor presentation changes
+
 Revision 1.8  2001/06/27 12:59:22  jj768
 logic to prevent "Use of uninitialized value in pattern match (m//)" errors on use of $vol{FileSystemName}
 

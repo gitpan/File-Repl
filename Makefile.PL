@@ -35,9 +35,6 @@ WriteMakefile(
     },
     HTMLLIBPODS => { 'Repl.pm'  => 'blib/html/site/lib/File/Repl.html'},
     MAN3PODS    => { 'Repl.pm'  => 'blib/man3/File::Repl.3' },
-    PM => {
-      'Repl.pm' => '$(INST_LIBDIR)/File/Repl.pm',
-      }
 );
 
 package MY;
