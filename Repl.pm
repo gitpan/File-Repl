@@ -1,8 +1,8 @@
 # File::Repl
 #
 # Version
-#      $Source: D:/src/perl/File/Repl/RCS\\repl.pm $
-#      $Revision: 1.5 $
+#      $Source: D:/src/perl/File/Repl/RCS/Repl.pm $
+#      $Revision: 1.8 $
 #      $State: Exp $
 #
 # Start comments/code here - will not be processed into manual pages
@@ -10,7 +10,13 @@
 #    Copyright © Dave Roberts  2000,2001
 #
 # Revision history:
-#      $Log: repl.pm $
+#      $Log: Repl.pm $
+#      Revision 1.8  2001/06/27 12:59:22  jj768
+#      logic to prevent "Use of uninitialized value in pattern match (m//)" errors on use of $vol{FileSystemName}
+#
+#      Revision 1.6  2001/06/21 12:32:15  jj768
+#      *** empty log message ***
+#
 #      Revision 1.5  2001/06/20 20:39:21  Dave.Roberts
 #      minor header changes
 #
@@ -86,7 +92,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = sprintf("%d.%d", q$Revision: 1.5 $ =~ /(\d+)\.(\d+)/);
+our $VERSION = sprintf("%d.%d", q$Revision: 1.8 $ =~ /(\d+)\.(\d+)/);
 
 # Preloaded methods go here.
 #---------------------------------------------------------------------
@@ -251,7 +257,7 @@ sub _generic {
       }elsif ( scalar(@_) == 5 ) {
       ($r_con,$regex,$negregex,$mode,$commit) = @_;
       }else{
-      carp ("Try calling the File::Repl->Update method with the right arguments !\n");
+      carp ("Call the Update method with the right arguments !\n\t\$ref->Update(regex, [noregex,] action, commit)");
       print scalar(@_), " Args called ( @_ )\n";
       return;
     }
@@ -263,7 +269,7 @@ sub _generic {
       }elsif ( scalar(@_) eq 4 ) {
       ($r_con,$regex,$negregex,$commit) =@_;
       }else{
-      carp ("Try calling the File::Repl->Delete method with the right arguments !\n");
+      carp ("Call the Delete method with the right arguments !\n\t\$ref->Delete(regex, [noregex], commit)");
     }
     }elsif($caller eq "Rename"){
     if ( scalar(@_) eq 4 ) {
@@ -272,10 +278,10 @@ sub _generic {
       }elsif ( scalar(@_) eq 5 ) {
       ($r_con,$regex,$negregex,$nsub,$commit) =@_;
       }else{
-      carp ("Try calling the File::Repl->Rename method with the right arguments !\n");
+      carp ("Call the Rename method with the right arguments !\n\t\$ref->Rename(regex, [noregex], namesub, commit)");
     }
   }
-  
+   
   
   my $nocase = $r_con->{nocase};
   
@@ -289,10 +295,12 @@ sub _generic {
   
 # Fix for stat/utime on FAT filesystems (NH270301)
   if ($TZ_BIAS) {
-    %vol = Win32::AdminMisc::GetVolumeInfo( $r_con->{dira} );
-    $tz_bias_a = $TZ_BIAS if ($vol{FileSystemName} =~ /FAT/);
-    %vol = Win32::AdminMisc::GetVolumeInfo( $r_con->{dirb} );
-    $tz_bias_b = $TZ_BIAS if ($vol{FileSystemName} =~ /FAT/);
+    if ( %vol = Win32::AdminMisc::GetVolumeInfo( $r_con->{dira} )){
+      $tz_bias_a = $TZ_BIAS if ($vol{FileSystemName} =~ m/FAT/);
+    }
+    if ( %vol = Win32::AdminMisc::GetVolumeInfo( $r_con->{dirb} )){
+      $tz_bias_b = $TZ_BIAS if ($vol{FileSystemName} =~ m/FAT/);
+    }
     $tz_bias_a = $tz_bias_b = 0 if ($tz_bias_a && $tz_bias_b);
   }
   
@@ -794,18 +802,18 @@ File::Repl - Perl module that provides file replication utilities
 
 =head1 SYNOPSIS
 
-use File::Repl;
+  use File::Repl;
 
-%con = {
-dira     => 'D:/perl',
-dirb     => 'M:/perl',
-verbose  => '1',
-age      => '10',
-};
+  %con = {
+    dira     => 'D:/perl',
+    dirb     => 'M:/perl',
+    verbose  => '1',
+    age      => '10',
+  };
 
-$ref=File::Repl->New(\%con);
-$ref->Update('\.p(l|m)','a<>b',1);
-$ref->Update('\.t.*','a<>b',1,'\.tmp$');
+  $ref=File::Repl->New(\%con);
+  $ref->Update('\.p(l|m)','a<>b',1);
+  $ref->Update('\.t.*','a<>b',1,'\.tmp$');
 
 =head1 DESCRIPTION
 
@@ -985,14 +993,14 @@ in the 'b' directory with a timestamp that is newer than that of the file
 in the 'a' directory it is not modified.  Orphan files in the 'b'
 directory are deleted.
 
-=item A<B
+=item AE<lt>B
 
 Files in the 'b' directory are to be replicated to the 'a' directory
 - even if no replica exists in 'a' directory.  If a replica already exists
 in the 'a' directory with a timestamp that is newer than that of the file
 in the 'b' directory it is not modified.
 
-=item A<B!
+=item AE<lt>B!
 
 Files in the 'b' directory are to be replicated to the 'a' directory
 - even if no replica exists in 'a' directory.  If a replica already exists
@@ -1000,7 +1008,7 @@ in the 'a' directory with a timestamp that is newer than that of the file
 in the 'b' directory it is not modified. Orphan files in the 'a'
 directory are deleted.
 
-=item A <>B
+=item AE<lt>>B
 
 Files in the 'a' directory are to be replicated to the 'b' directory
 - even if no replica exists in 'b' directory.  If a replica already exists
@@ -1038,11 +1046,13 @@ An optional regular expression used to match all files not to be renamed
 
 =item namesub
 
-The argument used for a perl substitution command
+The argument used for a perl substitution command is applied to the file name
+to create the file's new name.
 
 e.g. /\.pl$/\.perl\$/
 
-will rename all files (that meet I<regex> and I<noregex> criteria) from .pl to .perl
+This examplewill rename all files (that meet I<regex> and I<noregex> criteria)
+from .pl to .perl
 
 =item commit
 
@@ -1081,6 +1091,15 @@ When set TRUE makes deletions required - set FALSE to show potential changes
 (which are printed to STDOUT)
 
 =back
+
+=head1 REQUIRED MODULES
+
+  File::Find;
+  File::Copy;
+  File::Basename;
+
+  Win32::AdminMisc (Win32 platforms only)
+  Win32::API       (Win32 platforms only)
 
 =head1 TIMEZONE AND FILESYSTEMS
 
@@ -1123,7 +1142,14 @@ out of the use of the script.
 
 =head1 CHANGE HISTORY
 
-$Log: repl.pm $
+$Log: Repl.pm $
+Revision 1.8  2001/06/27 12:59:22  jj768
+logic to prevent "Use of uninitialized value in pattern match (m//)" errors on use of $vol{FileSystemName}
+
+Revision 1.6  2001/06/21 12:32:15  jj768
+
+*** empty log message ***
+
 Revision 1.5  2001/06/20 20:39:21  Dave.Roberts
 minor header changes
 
@@ -1145,5 +1171,6 @@ this is preparatory to the hash being passed as a reference
 Revision 1.3.3.0  2001/06/14 15:42:48  jj768
 minor code changes in constructing hash and improvement in documentation
 -still need more docs on Timezones.
+
 
 =cut
