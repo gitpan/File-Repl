@@ -1,0 +1,15 @@
+<SOFTPKG NAME="File-Repl" VERSION="1,3,3,0">
+	<TITLE>File-Repl</TITLE>
+	<ABSTRACT>File and Directory Replication Module</ABSTRACT>
+	<AUTHOR>Dave Roberts (DaveRoberts@iname.com)</AUTHOR>
+	<IMPLEMENTATION>
+		<OS NAME="MSWin32" />
+		<ARCHITECTURE NAME="MSWin32-x86-multi-thread" />
+		<CODEBASE HREF="x86/File-Repl.tar.gz" />
+	</IMPLEMENTATION>
+	<IMPLEMENTATION>
+		<OS NAME="MSWin32" />
+		<ARCHITECTURE NAME="MSWin32-x86-object" />
+		<CODEBASE HREF="x86/File-Repl.tar.gz" />
+	</IMPLEMENTATION>
+</SOFTPKG>
