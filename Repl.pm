@@ -2,7 +2,7 @@
 #
 # Version
 #      $Source: D:/src/perl/File/Repl/RCS/Repl.pm $
-#      $Revision: 1.17 $
+#      $Revision: 1.19 $
 #      $State: Exp $
 #
 # Start comments/code here - will not be processed into manual pages
@@ -11,6 +11,15 @@
 #
 # Revision history:
 #      $Log: Repl.pm $
+#      Revision 1.19  2001/11/21 21:28:19  Dave.Roberts
+#      resolved error in determining file age, especially when the 'a' file is
+#      missing
+#      evaluated the current time at start (set $runtime), and then removed
+#      many "time" calls
+#
+#      Revision 1.18  2001/08/22 07:10:41  Dave.Roberts
+#      logic change so that we don't use the Win32::API on win9x machines
+#
 #      Revision 1.17  2001/08/03 09:38:29  Dave.Roberts
 #      corrected code error (lines 572/3) where $$ was incorrectly used
 #      corrected code error (lines 572/3) where $$ was incorrectly used in truncation code
@@ -74,6 +83,10 @@ use File::Basename;
 use constant FALSE                => 0;
 use constant TRUE                 => 1;
 use constant TIME_ZONE_ID_INVALID => 0xFFFFFFFF;
+
+my($runtime) = time;
+
+
 #**************************************************************
 # On FAT filesystems, "stat" adds TZ_BIAS to the actual file
 # times (atime, ctime and mtime) and "utime" subtracts TZ_BIAS
@@ -88,23 +101,28 @@ use constant TIME_ZONE_ID_INVALID => 0xFFFFFFFF;
 #
 my $TZ_BIAS = 0;               # global package variable
 if ($^O eq 'MSWin32') {        # is this a win32 system ?
-  eval "use Win32::API";
-  eval "use Win32::AdminMisc";
+  if ( eval "use Win32" ) {
+    my($string,$major,$minor,$build,$id) = Win32::GetOSVersion();
+    if ( $id == 2 ) {   #  Machine is NT (0=Win32s, 1=Win9x etc)
+      eval "use Win32::API";
+      eval "use Win32::AdminMisc";
   
-  my $lpTimeZoneInformation = "\0" x 172;   # space for struct _TIME_ZONE_INFORMATION
-  my $GetTimeZoneInformation = new Win32::API("kernel32", 'GetTimeZoneInformation', ['P'], 'N');
-  croak "\n ERROR: failed to import GetTimeZoneInformation API function\n" if !$GetTimeZoneInformation;
-  my $ISDST = $GetTimeZoneInformation->Call($lpTimeZoneInformation);
-  croak "\n ERROR: GetTimeZoneInformation returned invalid data: " . Win32::FormatMessage(Win32::GetLastError())
-  if $ISDST == TIME_ZONE_ID_INVALID;
-  my ($Bias,$StandardBias,$DaylightBias) = unpack "l x80 l x80 l", $lpTimeZoneInformation;
+      my $lpTimeZoneInformation = "\0" x 172;   # space for struct _TIME_ZONE_INFORMATION
+      my $GetTimeZoneInformation = new Win32::API("kernel32", 'GetTimeZoneInformation', ['P'], 'N');
+      croak "\n ERROR: failed to import GetTimeZoneInformation API function\n" if !$GetTimeZoneInformation;
+      my $ISDST = $GetTimeZoneInformation->Call($lpTimeZoneInformation);
+      croak "\n ERROR: GetTimeZoneInformation returned invalid data: " . Win32::FormatMessage(Win32::GetLastError())
+      if $ISDST == TIME_ZONE_ID_INVALID;
+      my ($Bias,$StandardBias,$DaylightBias) = unpack "l x80 l x80 l", $lpTimeZoneInformation;
   
 # $ISDST == 0 -  No Daylight Savings in this timezone (no transition dates defined for this tz)
 # $ISDST == 1 -  Standard time
 # $ISDST == 2 -  Daylight Savings time
   
 # bias times are returned in minutes - convert to seconds
-  $TZ_BIAS = ($Bias + ($ISDST == 0 ? 0 : ($ISDST == 2 ? $DaylightBias : $StandardBias))) * 60;
+      $TZ_BIAS = ($Bias + ($ISDST == 0 ? 0 : ($ISDST == 2 ? $DaylightBias : $StandardBias))) * 60;
+    }
+  }
 }
 #**************************************************************
 require Exporter;
@@ -124,7 +142,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = sprintf("%d.%d", q$Revision: 1.17 $ =~ /(\d+)\.(\d+)/);
+our $VERSION = sprintf("%d.%d", q$Revision: 1.19 $ =~ /(\d+)\.(\d+)/);
 
 # Preloaded methods go here.
 #---------------------------------------------------------------------
@@ -366,8 +384,15 @@ sub _generic {
       return 0;
     }
     $msg = " $a $disp $b";
-    ($bmtime > $amtime) ? $age = $bmtime : $age = $amtime; # Find the most recent mtime ($age)
-    if ( $agelimit && (( time - $age ) > $agelimit )) { # Test for agelimit exceeded
+    if ( $amtime == 0 ) {
+      $age = $bmtime;
+    }elsif ( $bmtime == 0 ) {
+      $age = $amtime;
+    }else{
+      ($bmtime > $amtime) ? $age = $bmtime : $age = $amtime; # Find the most recent mtime ($age)
+    }
+    if ( $agelimit && (( $runtime - $age ) > $agelimit )) { # Test for agelimit exceeded
+      #print "amtime $amtime\nbmtime $bmtime\nage    $age\n";
       printf "%s - exceeds age limit (%3.1d days old - limit is set to %3d days)\n",$msg,(time - $age)/86400,$agelimit/86400 if ($verbose > 1);
       return FALSE;
     }
@@ -443,7 +468,7 @@ sub _generic {
     print "del ($targ,$mtime)\n" if $verbose > 3;
     my($msg);
     (-d $targ) ? $msg = "  rmdir  $targ" : $msg = "  rm $targ";
-    if ( $mtime && $agelimit && (( time - $mtime ) > $agelimit )) {
+    if ( $mtime && $agelimit && (( $runtime - $mtime ) > $agelimit )) {
       printf "%s - exceeds age limit (%3.1d days - limit is %3d days))\n", $msg, (time - $mtime)/(86400), $agelimit/(86400) if ( $verbose > 1 );
       return FALSE;
     }else{
@@ -475,7 +500,7 @@ $deltree = sub {
   };
   finddepth(\&$xxx, $dir . $targ);
   return if $top;
-  $commit ? $$reftime->{$targ} = (stat($dir . $targ))[9] : $$reftime->{$targ} = time;
+  $commit ? $$reftime->{$targ} = (stat($dir . $targ))[9] : $$reftime->{$targ} = $runtime;
 };
 
 #****************************************************************
@@ -488,7 +513,7 @@ $truncate = sub {
     chmod(0666,$$file_ref)  || carp "Failed to chmod 0666 $$file_ref\n";
     truncate($$file_ref, 0) || carp "Failed to truncate $$file_ref\n";
   }
-  $$mtime_ref = $commit ? (stat($$file_ref))[9] : time;
+  $$mtime_ref = $commit ? (stat($$file_ref))[9] : $runtime;
   $$file_ref = undef;
   return TRUE;
 };
@@ -503,7 +528,7 @@ $touch = sub {
     open(FILE, ">> $file") || carp "Failed to touch $file\n";
     close(FILE);
   }
-  ($$type_ref, $$mtime_ref) = $commit ? (stat($file))[2,9] : time;
+  ($$type_ref, $$mtime_ref) = $commit ? (stat($file))[2,9] : $runtime;
 };
 #****************************************************************
 # sub to rename a file or directory
@@ -575,8 +600,8 @@ if ( $caller eq "Update" ) {
     $bfile = $refb->{$_} ? $r_con->{dirb} . $_ : undef;
     &$truncate(\$afile, \$refa->{$_}) if ($afile && -s $afile);
     &$truncate(\$bfile, \$refb->{$_}) if ($bfile && -s $bfile);
-    delete $refa->{$_}, delete $refatype->{$_} if ($afile && (($refa->{$_} + $ttl) < time) && &$del($afile));
-    delete $refb->{$_}, delete $refbtype->{$_} if ($bfile && (($refb->{$_} + $ttl) < time) && &$del($bfile));
+    delete $refa->{$_}, delete $refatype->{$_} if ($afile && (($refa->{$_} + $ttl) < $runtime) && &$del($afile));
+    delete $refb->{$_}, delete $refbtype->{$_} if ($bfile && (($refb->{$_} + $ttl) < $runtime) && &$del($bfile));
   }
   # Note: modify arrays etc even if $commit is not set.  This is required to determine behaviour of code
   # without changing or deleting files and directories.
@@ -812,9 +837,9 @@ sub _arraysort {
 my @times; # global var
 sub benchmark ($@) {
 my($str,$r1,$u1,$s1) = @_;
-@times = $r1 ? ($r1,$u1,$s1) : (time, times), return if $str eq "init";
+@times = $r1 ? ($r1,$u1,$s1) : ( $runtime, times), return if $str eq "init";
 ($r1,$u1,$s1)   = @times unless $r1;
-my($r2,$u2,$s2) = (time, times);
+my($r2,$u2,$s2) = ( $runtime, times);
 printf "  %-13s: %2d secs  ( %.2f usr + %.2f sys = %.2f CPU )\n",
 $str, $r2-$r1, $u2-$u1, $s2-$s1, $u2-$u1 + $s2-$s1;
 }
@@ -1274,6 +1299,15 @@ out of the use of the script.
 =head1 CHANGE HISTORY
 
 $Log: Repl.pm $
+Revision 1.19  2001/11/21 21:28:19  Dave.Roberts
+resolved error in determining file age, especially when the 'a' file is
+missing
+evaluated the current time at start (set $runtime), and then removed
+many "time" calls
+
+Revision 1.18  2001/08/22 07:10:41  Dave.Roberts
+logic change so that we don't use the Win32::API on win9x machines
+
 Revision 1.17  2001/08/03 09:38:29  Dave.Roberts
 corrected code error (lines 572/3) where $$ was incorrectly used
 corrected code error (lines 572/3) where $$ was incorrectly used in truncation code
