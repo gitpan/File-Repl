@@ -1,0 +1,154 @@
+<HTML>
+<HEAD>
+<TITLE>File::Repl - Perl module that provides file replication utilities</TITLE>
+<LINK REV="made" HREF="mailto:root@ukcxs00005.ukc.cummins.com">
+</HEAD>
+
+<BODY>
+
+<!-- INDEX BEGIN -->
+
+<UL>
+
+	<LI><A HREF="#NAME">NAME</A>
+	<LI><A HREF="#SYNOPSIS">SYNOPSIS</A>
+	<LI><A HREF="#DESCRIPTION">DESCRIPTION</A>
+	<LI><A HREF="#AUTHOR">AUTHOR</A>
+</UL>
+<!-- INDEX END -->
+
+<HR>
+<P>
+<H1><A NAME="NAME">NAME</A></H1>
+<P>
+File::Repl - Perl module that provides file replication utilities
+
+<P>
+<HR>
+<H1><A NAME="SYNOPSIS">SYNOPSIS</A></H1>
+<P>
+<PRE>  use <A HREF="File::Repl">File::Repl</A>;
+</PRE>
+<P>
+<PRE>  %con = (
+     'dira',      'D:/perl',
+     'dirb',      'M:/perl',
+     'verbose',   '1',
+     );
+</PRE>
+<P>
+<PRE>  $ref=<A HREF="File::Repl::SetDefaults">File::Repl::SetDefaults</A>(%con);
+  $ref-&gt;Update('\.p(l|m)','a&lt;&gt;b',1);
+</PRE>
+<P>
+<HR>
+<H1><A NAME="DESCRIPTION">DESCRIPTION</A></H1>
+<P>
+The File:Repl module provides a simple file replication utility. This
+allows two directory structures to be maintained.
+
+<P>
+The Update routine has several arguments. The first argument is a regular
+expression, used to match all file names that to be maintained. The second
+argument defines the action to be performed.
+
+<DL>
+<DT><STRONG><A NAME="item_a">a&gt;b</A></STRONG><DD>
+<P>
+Files in the 'a' directory are to be replicated to the 'b' directory if a
+replica exists in 'b' directory and the timestamp is older than that of the
+file in the 'a' directory.
+
+<DT><STRONG><A NAME="item_a">a&lt;b</A></STRONG><DD>
+<P>
+Files in the 'b' directory are to be replicated to the 'a' directory if a
+replica exists in 'a' directory and the timestamp is older than that of the
+file in the 'b' directory.
+
+<DT><STRONG><A NAME="item_a">a&lt;&gt;b</A></STRONG><DD>
+<P>
+Files in the 'a' directory are to be replicated to the 'b' directory if a
+replica exists in 'b' directory and the timestamp is older than that of the
+file in the 'a' directory. Files in the 'b' directory are to be replicated
+to the 'a' directory if a replica exists in 'a' directory and the timestamp
+is older than that of the file in the 'b' directory.
+
+<DT><STRONG><A NAME="item_A">A&gt;B</A></STRONG><DD>
+<P>
+Files in the 'a' directory are to be replicated to the 'b' directory - even
+if no replica exists in 'b' directory. If a replica already exists in the
+'b' directory with a timestamp that is newer than that of the file in the
+'a' directory it is not modified.
+
+<DT><STRONG><A NAME="item_A">A&gt;B!</A></STRONG><DD>
+<P>
+Files in the 'a' directory are to be replicated to the 'b' directory - even
+if no replica exists in 'b' directory. If a replica already exists in the
+'b' directory with a timestamp that is newer than that of the file in the
+'a' directory it is not modified. Orphan files in the 'b' directory are
+deleted.
+
+<DT><STRONG><A NAME="item_A">A&lt;B</A></STRONG><DD>
+<P>
+Files in the 'b' directory are to be replicated to the 'a' directory - even
+if no replica exists in 'a' directory. If a replica already exists in the
+'a' directory with a timestamp that is newer than that of the file in the
+'b' directory it is not modified.
+
+<DT><STRONG><A NAME="item_A">A&lt;B!</A></STRONG><DD>
+<P>
+Files in the 'b' directory are to be replicated to the 'a' directory - even
+if no replica exists in 'a' directory. If a replica already exists in the
+'a' directory with a timestamp that is newer than that of the file in the
+'b' directory it is not modified. Orphan files in the 'a' directory are
+deleted. 
+
+<DT><STRONG><A NAME="item_B">B</A></STRONG><DD>
+<P>
+Files in the 'a' directory are to be replicated to the 'b' directory - even
+if no replica exists in 'b' directory. If a replica already exists in the
+'b' directory with a timestamp that is newer than that of the file in the
+'a' directory it is not modified. Files in the 'b' directory are to be
+replicated to the 'a' directory - even if no replica exists in 'a'
+directory. If a replica already exists in the 'a' directory with a
+timestamp that is newer than that of the file in the 'b' directory it is
+not modified.
+
+</DL>
+<P>
+The verbose flag has several valid values:
+
+<OL>
+<LI>
+<P>
+No verbosity (default mode)
+
+<LI>
+<P>
+All file copies and deletes are printed.  
+
+<LI>
+<P>
+Files identified in each directory that match the regex are printed.
+SetDefault parameters are also displayed, and the regex and commit
+parameters printed each time the Update routine is called.
+
+<LI>
+<P>
+Files with identical names in both directories are printed.  
+
+</OL>
+<P>
+<HR>
+<H1><A NAME="AUTHOR">AUTHOR</A></H1>
+<P>
+Copyright &#169; 2000 Dave Roberts, <A
+HREF="mailto:DaveRoberts@iname.com">DaveRoberts@iname.com</A>
+
+<P>
+This module is free software; you can redistribute it or modify it under
+the same terms as Perl itself. 
+
+</BODY>
+
+</HTML>
