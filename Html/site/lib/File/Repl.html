@@ -1,0 +1,336 @@
+<HTML>
+<HEAD>
+<TITLE>File::Repl - Perl module that provides file replication utilities</TITLE>
+<LINK REV="made" HREF="mailto:">
+</HEAD>
+
+<BODY>
+
+<A NAME="__index__"></A>
+<!-- INDEX BEGIN -->
+
+<UL>
+
+	<LI><A HREF="#name">NAME</A></LI>
+	<LI><A HREF="#synopsis">SYNOPSIS</A></LI>
+	<LI><A HREF="#description">DESCRIPTION</A></LI>
+	<LI><A HREF="#methods">METHODS</A></LI>
+	<LI><A HREF="#timezone and filesystems">TIMEZONE AND FILESYSTEMS</A></LI>
+	<LI><A HREF="#author">AUTHOR</A></LI>
+	<LI><A HREF="#support">SUPPORT</A></LI>
+	<LI><A HREF="#copyright">COPYRIGHT</A></LI>
+	<LI><A HREF="#change history">CHANGE HISTORY</A></LI>
+</UL>
+<!-- INDEX END -->
+
+<HR>
+<P>
+<H1><A NAME="name">NAME</A></H1>
+<P>File::Repl - Perl module that provides file replication utilities</P>
+<P>
+<HR>
+<H1><A NAME="synopsis">SYNOPSIS</A></H1>
+<PRE>
+  use File::Repl;</PRE>
+<PRE>
+  %con = {
+    dira     =&gt; 'D:/perl',
+    dirb     =&gt; 'M:/perl',
+    verbose  =&gt; '1',
+    age      =&gt; '10',
+  };</PRE>
+<PRE>
+  $ref=File::Repl-&gt;New(\%con);
+  $ref-&gt;Update('\.p(l|m)','a&lt;&gt;b',1);
+  $ref-&gt;Update('\.t.*','a&lt;&gt;b',1,'\.tmp$');</PRE>
+<P>
+<HR>
+<H1><A NAME="description">DESCRIPTION</A></H1>
+<P>The File:Repl provides simple file replication and management utilities. Its main
+functions are</P>
+<DL>
+<DT><STRONG><A NAME="item_File_Replication">File Replication</A></STRONG><BR>
+<DD>
+Allowing two directory structures to be maintained, ensuring files that meet
+selection logic criteria are mirrored and otherwise synchronized.
+<P></P>
+<DT><STRONG><A NAME="item_Bulk_Renaming">Bulk Renaming</A></STRONG><BR>
+<DD>
+Allowing files in a directory structure to be renamed according to the selection
+logic.
+<P></P>
+<DT><STRONG><A NAME="item_Compressing">Compressing</A></STRONG><BR>
+<DD>
+Allowing files in a directory structure to be compressed according to a given logic.
+<P></P>
+<DT><STRONG><A NAME="item_Process">Process</A></STRONG><BR>
+<DD>
+Run a common perl process against files in a directory structure according to selection
+logic.
+<P></P>
+<DT><STRONG><A NAME="item_Deletion">Deletion</A></STRONG><BR>
+<DD>
+Allowing files in a directory structure to be deleted according to the selection
+logic.
+<P></P></DL>
+<P>
+<HR>
+<H1><A NAME="methods">METHODS</A></H1>
+<DL>
+<DT><STRONG><A NAME="item_New"><STRONG>New(%con)</STRONG></A></STRONG><BR>
+<DD>
+The <STRONG>New</STRONG> method constructs a new File-Repl object.  Options are passed in the form of a hash
+reference <EM>\%con</EM> which define the file directories to be operated on and other parameters.
+The directories are scanned and each file is stat'ed.   The hash keys have the following definitions-
+<DL>
+<DT><STRONG><A NAME="item_dira">dira</A></STRONG><BR>
+<DD>
+This identifies the first directory to be scanned (required).
+<P></P>
+<DT><STRONG><A NAME="item_dirb">dirb</A></STRONG><BR>
+<DD>
+This identifies the second directory to be scanned (required).  If the object is only to
+have methods operate on it that operate on a single directory then dirb can be set to the
+same value as dira.  This minimizes the directory structure to be sesarched.
+<P></P>
+<DT><STRONG><A NAME="item_verbose">verbose</A></STRONG><BR>
+<DD>
+The verbose flag has several valid values:
+<OL>
+<LI>
+No verbosity (default mode).
+<P></P>
+<LI>
+All file copies and deletes are printed.
+<P></P>
+<LI>
+Tombstone file trunkations are printed, and any timestamp changes made,
+<P></P>
+<LI>
+Configuration settings (from <EM>%con</EM>) and Files meeting the match criteria are printed.
+<P></P>
+<LI>
+Files identified in each directory that match the regex requirements (from the <STRONG>Update</STRONG>
+method) are printed.
+<P></P></OL>
+<DT><STRONG><A NAME="item_age">age</A></STRONG><BR>
+<DD>
+This specifies the  maximum age of a file in days.  Files older than this will
+be ignored by Update, Rename, Compress and Delete methods.
+<P></P>
+<DT><STRONG><A NAME="item_recurse">recurse</A></STRONG><BR>
+<DD>
+When set to FALSE only files at the top level of the <STRONG>dira</STRONG> and <STRONG>dirb</STRONG> are scanned. Default
+value is
+<P></P>
+<DT><STRONG><A NAME="item_ttl">ttl</A></STRONG><BR>
+<DD>
+This is the time to live (<STRONG>ttl</STRONG> for any tombstoned file, in days.  Default value is 31.
+<P></P>
+<DT><STRONG><A NAME="item_nocase">nocase</A></STRONG><BR>
+<DD>
+Switches for case sensitivity - default is TRUE (case insensitive).
+<P></P>
+<DT><STRONG><A NAME="item_mkdirs">mkdirs</A></STRONG><BR>
+<DD>
+If either directory <STRONG>dira</STRONG> or <STRONG>dirb</STRONG> do not exist will attempt to create the directory
+if set TRUE.  Default value is FALSE.
+<P></P></DL>
+<DT><STRONG><A NAME="item_Update"><STRONG>Update(regex, [noregex,] action, commit)</STRONG></A></STRONG><BR>
+<DD>
+The <STRONG>Update</STRONG> method makes the file updates requested - determined by the <EM>%con</EM>
+hash (from the <STRONG>New</STRONG> method) and four associated arguments.
+<P>This method also allows
+files to be tombstoned (ie removed from the replicated file sets).  A file is tombstoned
+by appending <EM>.remove</EM> to the file name.  The first <STRONG>Update</STRONG> will cause the file to be
+set to zero size, and any replica files to be renamed (so the original file does not
+return).  The next update after the <STRONG>ttl</STRONG> has expired will cause deletion of all file
+replicas.</P>
+<P>If a directory is tombstoned (by adding <EM>.remove</EM> to its name) the directory and contents
+are removed and a file with the directory name and the <EM>.remove</EM> suffix replaces it.  The
+file is removed as a normally tombstoned file.</P>
+<DL>
+<DT><STRONG><A NAME="item_regex"><STRONG>regex</STRONG></A></STRONG><BR>
+<DD>
+A regular expression, used to match all file names that are to be maintained.
+<P></P>
+<DT><STRONG><A NAME="item_noregex"><STRONG>noregex</STRONG></A></STRONG><BR>
+<DD>
+An optional regular expression used to match all files not to be maintained
+(ie excluded from the operation).
+<P></P>
+<DT><STRONG><A NAME="item_action"><STRONG>action</STRONG></A></STRONG><BR>
+<DD>
+defines the action to be performed.
+<DL>
+<DT><STRONG><A NAME="item_a%3Eb">a&gt;b</A></STRONG><BR>
+<DD>
+Files in the 'a' directory are to be replicated to the 'b' directory
+if a replica exists in 'b' directory and the timestamp is older than that
+of the file in the 'a' directory.
+<P></P>
+<DT><STRONG><A NAME="item_a%3Cb">a&lt;b</A></STRONG><BR>
+<DD>
+Files in the 'b' directory are to be replicated to the 'a' directory
+if a replica exists in 'a' directory and the timestamp is older than that
+of the file in the 'b' directory.
+<P></P>
+<DT><STRONG><A NAME="item_a%3C%3Eb">a&lt;&gt;b</A></STRONG><BR>
+<DD>
+Files in the 'a' directory are to be replicated to the 'b' directory
+if a replica exists in 'b' directory and the timestamp is older than that
+of the file in the 'a' directory.  Files in the 'b' directory are to be
+replicated to the 'a' directory if a replica exists in 'a' directory and
+the timestamp is older than that of the file in the 'b' directory.
+<P></P>
+<DT><STRONG><A NAME="item_A%3EB">A&gt;B</A></STRONG><BR>
+<DD>
+Files in the 'a' directory are to be replicated to the 'b' directory
+- even if no replica exists in 'b' directory.  If a replica already exists
+in the 'b' directory with a timestamp that is newer than that of the file
+in the 'a' directory it is not modified.
+<P></P>
+<DT><STRONG><A NAME="item_A%3EB%21">A&gt;B!</A></STRONG><BR>
+<DD>
+Files in the 'a' directory are to be replicated to the 'b' directory
+- even if no replica exists in 'b' directory.  If a replica already exists
+in the 'b' directory with a timestamp that is newer than that of the file
+in the 'a' directory it is not modified.  Orphan files in the 'b'
+directory are deleted.
+<P></P>
+<DT><STRONG><A NAME="item_A%3CB">A&lt;B</A></STRONG><BR>
+<DD>
+Files in the 'b' directory are to be replicated to the 'a' directory
+- even if no replica exists in 'a' directory.  If a replica already exists
+in the 'a' directory with a timestamp that is newer than that of the file
+in the 'b' directory it is not modified.
+<P></P>
+<DT><STRONG><A NAME="item_A%3CB%21">A&lt;B!</A></STRONG><BR>
+<DD>
+Files in the 'b' directory are to be replicated to the 'a' directory
+- even if no replica exists in 'a' directory.  If a replica already exists
+in the 'a' directory with a timestamp that is newer than that of the file
+in the 'b' directory it is not modified. Orphan files in the 'a'
+directory are deleted.
+<P></P>
+<DT><STRONG><A NAME="item_A_%3C%3EB">A &lt;&gt;B</A></STRONG><BR>
+<DD>
+Files in the 'a' directory are to be replicated to the 'b' directory
+- even if no replica exists in 'b' directory.  If a replica already exists
+in the 'b' directory with a timestamp that is newer than that of the file
+in the 'a' directory it is not modified. Files in the 'b' directory are to
+be replicated to the 'a' directory - even if no replica exists in 'a'
+directory.  If a replica already exists in the 'a' directory with a
+timestamp that is newer than that of the file
+in the 'b' directory it is not modified.
+<P></P></DL>
+<DT><STRONG><A NAME="item_commit">commit</A></STRONG><BR>
+<DD>
+When set TRUE makes changes required - set FALSE to show potential changes
+(which are printed to STDOUT)
+<P></P></DL>
+<DT><STRONG><A NAME="item_Rename"><STRONG>Rename(regex, [noregex], namesub, commit)</STRONG></A></STRONG><BR>
+<DD>
+The <STRONG>Rename</STRONG> method is used to rename files in the <EM>dira</EM> directory structure
+in the object specified in the <STRONG>New</STRONG> method.
+<DL>
+<DT><STRONG>regex</STRONG><BR>
+<DD>
+A regular expression, used to match all file names that are to be deleted.
+<P></P>
+<DT><STRONG>noregex</STRONG><BR>
+<DD>
+An optional regular expression used to match all files not to be deleted
+(ie excluded from the operation).
+<P></P>
+<DT><STRONG><A NAME="item_namesub">namesub</A></STRONG><BR>
+<DD>
+The argument used for a perl substitution command
+<PRE>
+  e.g. /\.pl$/\.perl\$/</PRE>
+<P>will rename all files (that meet <EM>regex</EM> and <EM>noregex</EM> criteria from .pl to .perl</P>
+<P></P>
+<DT><STRONG>commit</STRONG><BR>
+<DD>
+When set TRUE makes deletions required - set FALSE to show potential changes
+(which are printed to STDOUT)
+<P></P></DL>
+<DT><STRONG><STRONG>Process</STRONG></STRONG><BR>
+<DD>
+Not yet implemeneted
+<P></P>
+<DT><STRONG><A NAME="item_Compress"><STRONG>Compress</STRONG></A></STRONG><BR>
+<DD>
+Not yet implemented
+<P></P>
+<DT><STRONG><A NAME="item_Delete"><STRONG>Delete(regex, [noregex], commit)</STRONG></A></STRONG><BR>
+<DD>
+The <STRONG>Delete</STRONG> method removes files from the <EM>dira</EM> directory structure in the object
+specified in the <STRONG>New</STRONG> method.
+<DL>
+<DT><STRONG><STRONG>regex</STRONG></STRONG><BR>
+<DD>
+A regular expression, used to match all file names that are to be deleted.
+<P></P>
+<DT><STRONG><STRONG>noregex</STRONG></STRONG><BR>
+<DD>
+An optional regular expression used to match all files not to be deleted
+(ie excluded from the operation).
+<P></P>
+<DT><STRONG>commit</STRONG><BR>
+<DD>
+When set TRUE makes deletions required - set FALSE to show potential changes
+(which are printed to STDOUT)
+<P></P></DL>
+</DL>
+<P>
+<HR>
+<H1><A NAME="timezone and filesystems">TIMEZONE AND FILESYSTEMS</A></H1>
+<P>On FAT filesystems, mtime resolution is 1/30th of a second.  A fudge of 2 seconds
+is used for synching FAT with other filesystems.  Note that FAT filesystems
+save the local time in UTC (GMT).</P>
+<P>On FAT filesystems, ``stat'' adds TZ_BIAS to the actual file times (atime, ctime and
+mtime) and conversley ``utime'' subtracts TZ_BIAS from the supplied parameters before
+setting file times.  To maintain FAT at UTC time, we need to do the opposite.</P>
+<P>If we don't maintain FAT filesystems at UTC time and the repl is between FAT and
+NON-FAT systems, then all files will get replicated whenever the TZ or Daylight
+Savings Time changes.</P>
+<P>
+<HR>
+<H1><A NAME="author">AUTHOR</A></H1>
+<P>Dave Roberts</P>
+<P>
+<HR>
+<H1><A NAME="support">SUPPORT</A></H1>
+<P>You can send bug reports and suggestions for improvements on this module
+to me at <A HREF="mailto:DaveRoberts@iname.com.">DaveRoberts@iname.com.</A> However, I can't promise to offer
+any other support for this script.</P>
+<P>
+<HR>
+<H1><A NAME="copyright">COPYRIGHT</A></H1>
+<P>This module is Copyright © 2000, 2001 Dave Roberts. All rights reserved.</P>
+<P>This script is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself. This script is distributed in the
+hope that it will be useful, but WITHOUT ANY WARRANTY; without even
+the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+PURPOSE. The copyright holder of this script can not be held liable
+for any general, special, incidental or consequential damages arising
+out of the use of the script.</P>
+<P>
+<HR>
+<H1><A NAME="change history">CHANGE HISTORY</A></H1>
+<P>$Log: repl.pm $
+Revision 1.3.5.0  2001/06/19 10:34:11  jj768
+Revised calling of the New method to use a hash reference, rather
+than a hash directly</P>
+<P>Revision 1.3.4.0  2001/06/19 09:48:38  jj768
+intermediate development revision.  Introduced Delete method and the _generic
+subroutine (used for all methods except New)
+this is preparatory to the hash being passed as a reference</P>
+<P>Revision 1.3.3.0  2001/06/14 15:42:48  jj768
+minor code changes in constructing hash and improvement in documentation
+-still need more docs on Timezones.</P>
+
+</BODY>
+
+</HTML>
