@@ -1,0 +1,9 @@
+<SOFTPKG NAME="File-Repl" VERSION="1,27,0,0">
+    <TITLE>File-Repl</TITLE>
+    <ABSTRACT>module that provides file replication utilities</ABSTRACT>
+    <AUTHOR>Dave Roberts (robertsdavea@googlemail.com)</AUTHOR>
+    <IMPLEMENTATION>
+        <OS NAME="MSWin32" />
+        <CODEBASE HREF="File-Repl-1.27-PPM.tar.gz" />
+    </IMPLEMENTATION>
+</SOFTPKG>
