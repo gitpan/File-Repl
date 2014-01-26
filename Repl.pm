@@ -1,8 +1,8 @@
 # File::Repl
 #
 # Version
-#      $Source: D:/src/perl/File/Repl/RCS/repl.pm $
-#      $Revision: 1.29 $
+#      $Source: C:/src/perl/File/Repl/RCS/repl.pm $
+#      $Revision: 1.31 $
 #      $State: Exp $
 #
 # Start comments/code here - will not be processed into manual pages
@@ -11,6 +11,13 @@
 #
 # Revision history:
 #      $Log: repl.pm $
+#      Revision 1.31  2014/01/25 21:27:59  Dave.Roberts
+#      as advised from CPAN testing modified to include
+#      =encoding utf8
+#      and
+#      escape the < and > characters in the pod with E<lt> and
+#      E<gt> respectively.
+#
 #      Revision 1.29  2010/05/04 15:02:05  Dave.Roberts
 #      corrected documentation - layout near Update method was incorrect
 #
@@ -173,7 +180,7 @@ our @EXPORT = qw(
 
 );
 
-our $VERSION = sprintf("%d.%d", q$Revision: 1.29 $ =~ /(\d+)\.(\d+)/);
+our $VERSION = sprintf("%d.%d", q$Revision: 1.31 $ =~ /(\d+)\.(\d+)/);
 
 # Preloaded methods go here.
 #---------------------------------------------------------------------
@@ -928,6 +935,8 @@ $str, $r2-$r1, $u2-$u1, $s2-$s1, $u2-$u1 + $s2-$s1;
 1;
 __END__
 
+=encoding utf8
+
 =head1 NAME
 
 File::Repl - Perl module that provides file replication utilities
@@ -1085,7 +1094,7 @@ meeting the selection criteria to be returned. See L<"EXAMPLES">.  Note that the
 bonly, amatch and bmatch array references, and the common hash reference all refer to the
 file structure state BEFORE the Update method makes any changes.
 
-=over 0
+=over
 
 =item B<regex>
 
@@ -1099,23 +1108,23 @@ An optional regular expression used to match all files not to be maintained
 =item B<action>
 
 defines the action to be performed. Note that tombstoning activities ignore the action
-and assume the A<>B directive for those files and directories being tombstoned.
+and assume the AE<lt>E<gt>B directive for those files and directories being tombstoned.
 
 =over 4
 
-=item a>b
+=item aE<gt>b
 
 Files in the 'a' directory are to be replicated to the 'b' directory
 if a replica exists in 'b' directory and the timestamp is older than that
 of the file in the 'a' directory.
 
-=item a<b
+=item aE<lt>b
 
 Files in the 'b' directory are to be replicated to the 'a' directory
 if a replica exists in 'a' directory and the timestamp is older than that
 of the file in the 'b' directory.
 
-=item a<>b
+=item aE<lt>E<gt>b
 
 Files in the 'a' directory are to be replicated to the 'b' directory
 if a replica exists in 'b' directory and the timestamp is older than that
@@ -1123,14 +1132,14 @@ of the file in the 'a' directory.  Files in the 'b' directory are to be
 replicated to the 'a' directory if a replica exists in 'a' directory and
 the timestamp is older than that of the file in the 'b' directory.
 
-=item A>B
+=item AE<gt>B
 
 Files in the 'a' directory are to be replicated to the 'b' directory
 - even if no replica exists in 'b' directory.  If a replica already exists
 in the 'b' directory with a timestamp that is newer than that of the file
 in the 'a' directory it is not modified.
 
-=item A>B!
+=item AE<gt>B!
 
 Files in the 'a' directory are to be replicated to the 'b' directory
 - even if no replica exists in 'b' directory.  If a replica already exists
@@ -1153,7 +1162,7 @@ in the 'a' directory with a timestamp that is newer than that of the file
 in the 'b' directory it is not modified. Orphan files in the 'a'
 directory are deleted.
 
-=item AE<lt>>B
+=item AE<lt>E<gt>B
 
 Files in the 'a' directory are to be replicated to the 'b' directory
 - even if no replica exists in 'b' directory.  If a replica already exists
@@ -1178,7 +1187,7 @@ When set TRUE makes changes required - set FALSE to show potential changes
 The B<Rename> method is used to rename files in the I<dira> directory structure
 in the object specified in the B<New> method.
 
-=over 0
+=over 4
 
 =item regex
 
@@ -1219,7 +1228,7 @@ Not yet implemented
 The B<Delete> method removes files from the I<dira> directory structure in the object
 specified in the B<New> method.
 
-=over 0
+=over 4
 
 =item B<regex>
 
@@ -1240,6 +1249,8 @@ When set TRUE makes deletions required - set FALSE to show potential changes
 =item B<Version>
 
 The Version method returns the File::Repl module version. No calling argument is necessary.
+
+=back
 
 =head1 REQUIRED MODULES
 
@@ -1442,6 +1453,13 @@ out of the use of the script.
 =head1 CHANGE HISTORY
 
 $Log: repl.pm $
+Revision 1.31  2014/01/25 21:27:59  Dave.Roberts
+as advised from CPAN testing modified to include
+=encoding utf8
+and
+escape the < and > characters in the pod with E<lt> and
+E<gt> respectively.
+
 Revision 1.29  2010/05/04 15:02:05  Dave.Roberts
 corrected documentation - layout near Update method was incorrect
 
@@ -1497,7 +1515,7 @@ additional documentation - and minor code changes
 
 Revision 1.13  2001/07/12 15:18:43  Dave.Roberts
 code tidy up and reorganisation
-fixed logic errors (A>B! mode in Update method was not copying new files from A to B), also for A<B!
+fixed logic errors (AE<gt>B! mode in Update method was not copying new files from A to B), also for AE<lt>B!
 removed several local variables and used referred object directly
 
 Revision 1.12  2001/07/11 10:30:16  Dave.Roberts

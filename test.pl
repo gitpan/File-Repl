@@ -6,7 +6,7 @@
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..3\n"; }
+BEGIN { $| = 1; print "1..14\n"; }
 my($testno);
 END {
   unless ($ok){
@@ -18,10 +18,11 @@ END {
 ######################## First test - check the module loads
 $testno = 1;
 undef $ok;
+print "\ntest $testno:\n";
 
 use File::Repl;
 $ok = 1;
-print "ok 1\n";
+print "\n\tok $testno - File::Repl module loaded\n";
 ######################## Alternative way to test module is installed
 #eval
 #{
@@ -40,34 +41,38 @@ print "ok 1\n";
 
 ######################## test 2 - check File::Temp module loads
 # this is required to create temporary data structure for remaining tests
-$testno = 2;
+$testno++;
 undef $ok;
+print "\ntest $testno:\n";
 
 use File::Temp qw/ tempfile tempdir /;
 $ok = 1;
-print "ok $testno - loaded module File::Temp required for testing\n";
+print "\n\tok $testno - loaded module File::Temp required for testing\n";
 
 ######################## - check File::Find module loads
 # this is required to search/find files created during testing
 $testno++;
 undef $ok;
+print "\ntest $testno:\n";
 
 use File::Find;
 $ok = 1;
-print "ok $testno - loaded module File::Find required for testing\n";
+print "\n\tok $testno - loaded module File::Find required for testing\n";
 
 ######################## - check use File::Compare; module loads
 # this is required to test files comparisons following replication
 $testno++;
 undef $ok;
+print "\ntest $testno:\n";
 
 use File::Compare;
 $ok = 1;
-print "ok $testno - loaded module File::Compare required for testing\n";
+print "\n\tok $testno - loaded module File::Compare required for testing\n";
 
 ######################## - Create common directories/variables for testing
 $testno++;
 undef $ok;
+print "\ntest $testno:\n";
 $dir = tempdir ( CLEANUP => 1);
 $dira       = $dir . '/file-repl.tsta';
 $dirb       = $dir . '/file-repl.tstb';
@@ -88,26 +93,31 @@ my(%hash);
 );
 
 $ok = 1;
-print "ok $testno - created temporary directory $dir and variables for testing\n";
+print "\n\tok $testno - created temporary directory $dir and variables for testing\n";
 #######################  - check New method
 $testno++;
 undef $ok;
+print "\ntest $testno:\n";
 if ($ref=File::Repl->New(\%hash)){
   $ok = 1;
-  print "ok $testno - sucessfully created New instance of File::Repl\n";
   }else{
   exit;
 }
+exit unless ( $ok eq 1 );
+print "\n\tok $testno - sucessfully created New instance of File::Repl\n";
 
 #######################  - check version is reported by module
 $testno++;
 undef $ok;
+print "\ntest $testno:\n";
 if ($ver = $ref->Version){
   $ok = 1;
-  print "ok $testno - File::Repl reports version as $ver\n";
   }else{
+  print "\tFile::Repl failed to report versionas\n";
   exit;
 }
+exit unless ( $ok eq 1 );
+print "\n\tok $testno - File::Repl reports version as $ver\n";
 
 #######################
 #   replicate files and directory structure with Update method a>b
@@ -136,7 +146,7 @@ TESTA: foreach (@files) {
   }
 }
 exit unless ( $ok eq 1 );
-print "\nok $testno - Update(a>b) method tested\n";
+print "\n\tok $testno - Update(a>b) method tested\n";
 
 #######################
 #   Test the A>B option does not replicate if commit argument is set to 0
@@ -149,7 +159,7 @@ $ref->Update('.*','A>B',0);
 undef $ref;
 # deem this successful if NO files have been replicated successfully from a to be
 $ok = 1;
-print "\t";
+#print "\t";
 TESTB: foreach (@files) {
   if ( (&_s4($atarget . '/' . $_,  $btarget . '/' . $_)) == 2 ) {
     print "\tfile $_ did not replicate from $atarget to $btarget - ok\n" if $debug;
@@ -161,7 +171,7 @@ TESTB: foreach (@files) {
   }
 }
 exit unless ( $ok eq 1 );
-print "\nok $testno - Update(A>B) with commit=0 method tested\n";
+print "\n\tok $testno - Update(A>B) with commit=0 method tested\n";
 
 #######################
 #   Test the A>B option does replicate all files if commit argument is set to 1
@@ -190,7 +200,7 @@ TESTC: foreach (@files) {
   }
 }
 exit unless ( $ok eq 1 );
-print "\nok $testno - Update(A>B) with commit=1 method tested\n";
+print "\n\tok $testno - Update(A>B) with commit=1 method tested\n";
 #######################
 #   Test the a>b option does not replicate a file when the destination is newer
 $testno++;
@@ -205,7 +215,7 @@ my($dev2,$ino2,$mode2,$nlink2,$uid2,$gid2,$rdev2,$size2,
 $atime,$mtime,$ctime2,$blksize2,$blocks2)
 = stat($tstfilea);
 
-print "   revising mtime on file $tstfileb from $mtime to" if $debug;
+print "\trevising mtime on file $tstfileb from $mtime to" if $debug;
 $mtime = $mtime +10;
 print " $mtime \n" if $debug;
 utime ($atime,$mtime, $tstfileb);
@@ -223,24 +233,24 @@ TESTD: foreach (@files) {
   $result = (&_s4($atarget . '/' . $_,  $btarget . '/' . $_));
   if ( $result == 0 ) {
     if ( $tstfile eq $_ ) {
-      print "   file $_ was replicated from $atarget to $btarget - not ok\n";
+      print "\tfile $_ was replicated from $atarget to $btarget - not ok\n";
       $ok = 0;
       last TESTD;
       }else{
-      print "   file $_ is identical in $atarget and $btarget - ok\n" if $debug;
+      print "\tfile $_ is identical in $atarget and $btarget - ok\n" if $debug;
       print "." unless $debug;
     }
     }elsif ( ($result == 5) && ( $tstfile eq $_ ) ) {
-    print "   file $_ has not been replicated from $atarget to $btarget - ok\n" if $debug;
+    print "\tfile $_ has not been replicated from $atarget to $btarget - ok\n" if $debug;
     print "." unless $debug;
     }else{
-    print "   file $_ did not replicate from $atarget to $btarget - not ok\n";
+    print "\tfile $_ did not replicate from $atarget to $btarget - not ok\n";
     $ok = 0;
     last TESTD;
   }
 }
 exit unless ( $ok eq 1 );
-print "\nok $testno - Update(a>b) with commit=1 method tested - does not overwrite newer file\n";
+print "\n\tok $testno - Update(a>b) with commit=1 method tested - does not overwrite newer file\n";
 #######################
 #   Test the a>b option does replicate a file when the destination is older
 #   This tests that the $tstfile from test 5, after the replica in $targetb is made
@@ -253,7 +263,7 @@ my($dev2,$ino2,$mode2,$nlink2,$uid2,$gid2,$rdev2,$size2,
 $atime,$mtime,$ctime2,$blksize2,$blocks2)
 = stat($tstfilea);
 
-print "   revising mtime on file $tstfileb from $mtime to" if $debug;
+print "\trevising mtime on file $tstfileb from $mtime to" if $debug;
 $mtime = $mtime -20;
 print " $mtime \n" if $debug;
 utime ($atime,$mtime, $tstfileb);
@@ -279,7 +289,7 @@ TESTE: foreach (@files) {
   }
 }
 exit unless ( $ok eq 1 );
-print "\nok $testno - Update(a>b) with commit=1 method tested - does overwrite older file\n";
+print "\n\tok $testno - Update(a>b) with commit=1 method tested - does overwrite older file\n";
 #######################
 #   Delete One file from dira and verify it is not deleted using the A>B  argument
 $testno++;
@@ -323,7 +333,7 @@ TESTF: foreach (@files) {
   }
 }
 exit unless ( $ok eq 1 );
-print "\nok $testno - Update(A>B) with commit=1 method tested - does not delete file in dirb when missing from dira\n";
+print "\n\tok $testno - Update(A>B) with commit=1 method tested - does not delete file in dirb when missing from dira\n";
 #######################
 #   Test Delete method.  Delete one file from dira
 $testno++;
@@ -352,20 +362,16 @@ if ( -f $tfile ){
   }elsif( $ok == 2) {
 #   only get here if the file does not remain, but was installed
   $ok = 1;
-  print "test file deleted succesfully\n" if $debug;
+  print "\ttest file deleted succesfully\n" if $debug;
 }
-print "failed to remove test file\n" unless ($ok == 1);
+print "\tfailed to remove test file\n" unless ($ok == 1);
 undef $ref;
 
-if ( $success eq 1 ) {
-  print "\nok 8\n";
+exit unless ( $ok eq 1 );
+  print "\n\tok $testno - Delete method tested\n";
   $testsok ++;
-  }else{
-  print "\nnot ok 8\n";
-}
-$testsrun ++;
 ####################### if we get here then print all OK
-print "all tests completed OK\n";
+print "\nall tests completed OK\n";
 
 
 exit;
